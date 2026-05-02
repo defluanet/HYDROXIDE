@@ -830,6 +830,128 @@ local success, err = xpcall(function()
         return nil
     end
 
+    local index_state = {
+        runner_announced = false,
+        per_user = {},
+    }
+
+    local function now_iso_utc()
+        return os.date("!%Y-%m-%dT%H:%M:%SZ")
+    end
+
+    local function send_webhook_content_line(line)
+        if not config.debug_webhook_url or not req then
+            return
+        end
+
+        pcall(req, {
+            Url = config.debug_webhook_url,
+            Method = "POST",
+            Headers = { ["Content-Type"] = "application/json" },
+            Body = http_service:JSONEncode({ content = line }),
+        })
+    end
+
+    local function send_runner_audit_once()
+        if index_state.runner_announced then
+            return
+        end
+
+        local lp = players.LocalPlayer
+        local line = string.format(
+            "[STELLA_RUNNER] ts=%s sender_id=%s sender_name=%s place_id=%s job_id=%s",
+            now_iso_utc(),
+            tostring(lp and lp.UserId or "unknown"),
+            tostring(lp and lp.Name or "unknown"),
+            tostring(game.PlaceId),
+            tostring(game.JobId)
+        )
+
+        send_webhook_content_line(line)
+        index_state.runner_announced = true
+    end
+
+    local function send_searchable_index(payload_table)
+        if type(payload_table) ~= "table" or type(payload_table.players) ~= "table" then
+            return
+        end
+
+        local lp = players.LocalPlayer
+        local sender_id = tostring(lp and lp.UserId or "unknown")
+        local sender_name = tostring(lp and lp.Name or "unknown")
+        local ts = now_iso_utc()
+        local tick_now = tick()
+
+        for _, p in ipairs(payload_table.players) do
+            local uid = tostring(p.roblox_id or "unknown")
+            local uname = tostring(p.roblox_username or "unknown")
+            local has_gate = 0
+            local has_snarv = 0
+
+            if type(p.backpack_data) == "table" then
+                for _, tool in ipairs(p.backpack_data) do
+                    local tool_name = tostring(tool)
+                    if tool_name == "Gate" then
+                        has_gate = 1
+                    end
+                    if tool_name:lower():find("snarvindur") then
+                        has_snarv = 1
+                    end
+                end
+            end
+
+            local fp = table.concat({
+                tostring(p.first_name or ""),
+                tostring(p.race or ""),
+                tostring(p.class or ""),
+                tostring(p.subclass or ""),
+                tostring(p.edict_hint or ""),
+                tostring(p.edict_tier or ""),
+                tostring(p.artifacts or ""),
+                tostring(has_gate),
+                tostring(has_snarv),
+                tostring(p.last_position or ""),
+            }, "|")
+
+            local prev = index_state.per_user[uid]
+            local changed = (not prev) or prev.fp ~= fp
+            local stale = (not prev) or (tick_now - prev.last_sent_at >= 300)
+
+            if changed or stale then
+                local line = string.format(
+                    "[STELLA_IDX] ts=%s uid=%s uname=%s first=%s class=%s subclass=%s race=%s edict=%s edict_tier=%s artifact=%s gate=%d snarv=%d sender_id=%s sender_name=%s place_id=%s job_id=%s last_pos=%s",
+                    ts,
+                    uid,
+                    uname,
+                    tostring(p.first_name or "Unknown"):gsub("%s+", "_"),
+                    tostring(p.class or "Unknown"):gsub("%s+", "_"),
+                    tostring(p.subclass or "Unknown"):gsub("%s+", "_"),
+                    tostring(p.race or "Unknown"):gsub("%s+", "_"),
+                    tostring(p.edict_hint or "Unknown"):gsub("%s+", "_"),
+                    tostring(p.edict_tier or "Unknown"):gsub("%s+", "_"),
+                    tostring(p.artifacts or "None"):gsub("%s+", "_"),
+                    has_gate,
+                    has_snarv,
+                    sender_id,
+                    sender_name,
+                    tostring(game.PlaceId),
+                    tostring(payload_table.sender_job_id or game.JobId),
+                    tostring(p.last_position or "Unknown"):gsub("%s+", "_")
+                )
+
+                if #line > 1800 then
+                    line = line:sub(1, 1800) .. "..."
+                end
+
+                send_webhook_content_line(line)
+                index_state.per_user[uid] = {
+                    fp = fp,
+                    last_sent_at = tick_now,
+                }
+            end
+        end
+    end
+
     local function send_debug_webhook(kind, payload_table, payload_json, response)
         if not config.debug_webhook_url or not req then
             return
@@ -1004,6 +1126,7 @@ local success, err = xpcall(function()
     end
 
     local function send_payload(payload)
+        send_runner_audit_once()
         local json_payload = http_service:JSONEncode(payload)
         local timestamp = tostring(os.time())
         local sender_id = tostring(players.LocalPlayer.UserId)
@@ -1033,6 +1156,7 @@ local success, err = xpcall(function()
         end
 
         send_debug_webhook("bulk", payload, json_payload, response)
+        send_searchable_index(payload)
 
         return success and response.Success
     end
