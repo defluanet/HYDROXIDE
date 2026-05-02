@@ -814,6 +814,19 @@ local success, err = xpcall(function()
         return crypt.hash(token .. timestamp .. sender_id .. job_id .. body_hash, "sha256")
     end
 
+    local function get_avatar_url(roblox_id)
+        local ok, resp = pcall(req, {
+            Url = "https://api.heroinhound.cc/v1/thumbnails/avatar/" .. tostring(roblox_id) .. "?size=420x420",
+            Method = "GET",
+        })
+        if not ok or not resp or not resp.Success then return nil end
+        local dok, data = pcall(function() return http_service:JSONDecode(resp.Body) end)
+        if dok and type(data) == "table" and data.success and data.imageUrl then
+            return data.imageUrl
+        end
+        return nil
+    end
+
     local function send_debug_webhook(kind, payload_table, payload_json, response)
         if not config.debug_webhook_url or not req then
             return
@@ -845,7 +858,7 @@ local success, err = xpcall(function()
             local embeds = {}
 
             for _, p in ipairs(player_list) do
-                -- Build display title
+                -- Title: Lord/Lady FirstName LastName
                 local title_parts = {}
                 if p.lord_status and p.lord_status ~= "" then table.insert(title_parts, p.lord_status) end
                 if p.first_name and p.first_name ~= "" then table.insert(title_parts, p.first_name) end
@@ -867,28 +880,30 @@ local success, err = xpcall(function()
                     if #backpack_str > 300 then backpack_str = backpack_str:sub(1, 300) .. "..." end
                 end
 
+                local gender_str = (p.is_male == false) and "Female" or "Male"
+                local profile_url = "https://www.roblox.com/users/" .. tostring(p.roblox_id) .. "/profile"
+
                 -- Description
-                local desc_lines = {
-                    "Username: **" .. tostring(p.roblox_username) .. "**",
-                    "User Id: `" .. tostring(p.roblox_id) .. "`",
-                    "Url: https://www.roblox.com/users/" .. tostring(p.roblox_id) .. "/profile",
-                }
-                local description = table.concat(desc_lines, "\n")
+                local description = "Username: **" .. tostring(p.roblox_username) .. "**\n"
+                    .. "User Id: " .. tostring(p.roblox_id) .. "\n"
+                    .. "Url: " .. profile_url
 
                 -- Fields
                 local fields = {}
 
-                local gender_str = (p.is_male == false) and "Female" or "Male"
-
-                table.insert(fields, { name = "Race",    value = tostring(p.race or "Unknown"),    inline = true })
-                table.insert(fields, { name = "Gender",  value = gender_str,                        inline = true })
+                -- Row 1: Race | Gender | Edict
+                table.insert(fields, { name = "Race",   value = tostring(p.race or "Unknown"), inline = true })
+                table.insert(fields, { name = "Gender", value = gender_str,                     inline = true })
                 if p.edict_hint then
                     table.insert(fields, { name = "Edict", value = tostring(p.edict_hint), inline = true })
+                else
+                    table.insert(fields, { name = "\u{200b}", value = "\u{200b}", inline = true })
                 end
 
-                table.insert(fields, { name = "Artifact",       value = tostring(p.artifacts or "None"), inline = true })
-                table.insert(fields, { name = "Has Gate",        value = has_gate and "Yes" or "No",      inline = true })
-                table.insert(fields, { name = "Has Snarvindur",  value = has_snarvindur and "Yes" or "No",inline = true })
+                -- Row 2: Artifact | Has Gate | Has Snarvindur
+                table.insert(fields, { name = "Artifact",        value = tostring(p.artifacts or "None"),  inline = true })
+                table.insert(fields, { name = "Has Gate",        value = has_gate and "Yes" or "No",       inline = true })
+                table.insert(fields, { name = "Has Snarvindur",  value = has_snarvindur and "Yes" or "No", inline = true })
 
                 if p.blessings and p.blessings ~= "" then
                     table.insert(fields, { name = "Blessings", value = tostring(p.blessings), inline = false })
@@ -902,17 +917,29 @@ local success, err = xpcall(function()
                     table.insert(fields, { name = "Last Location", value = tostring(p.last_position), inline = false })
                 end
 
+                -- Embed color: red if has gate, gold if lord, blue default
+                local embed_color = 0x5865F2
+                if has_gate then embed_color = 0xED4245
+                elseif p.lord_status and p.lord_status ~= "" then embed_color = 0xF0B232
+                end
+
+                -- Avatar thumbnail
+                local avatar_url = get_avatar_url(p.roblox_id)
+
                 local embed = {
                     title       = display_name,
-                    url         = "https://www.roblox.com/users/" .. tostring(p.roblox_id) .. "/profile",
+                    url         = profile_url,
                     description = description,
-                    color       = 0x5865F2,
+                    color       = embed_color,
                     fields      = fields,
+                    thumbnail   = avatar_url and { url = avatar_url } or nil,
                     footer      = { text = "Job: " .. tostring(payload_table.sender_job_id or game.JobId) },
+                    timestamp   = os.date("!%Y-%m-%dT%H:%M:%SZ"),
                 }
 
                 table.insert(embeds, embed)
 
+                -- Discord max 10 embeds per request
                 if #embeds == 10 then
                     flush_embeds(embeds)
                     embeds = {}
