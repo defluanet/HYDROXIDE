@@ -55,10 +55,6 @@ local success, err = xpcall(function()
         send_interval = 35,
         api_fetch_interval = 300, -- seconds between Roblox API server list fetches
 
-        -- Optional debug mirror for inspecting outgoing payloads.
-        discord_webhook_url = "https://discord.com/api/webhooks/1496970491611578511/-8kedJWxqFK8UOSWQ77b1ugQM_eFHdIv7hSJSyNPSBtupsQd_t772FxiEZVrIYsOfncv",
-        discord_preview_enabled = true,
-
         debug = user_debug,
     }
 
@@ -69,50 +65,6 @@ local success, err = xpcall(function()
         else
             print("[Stella]", ...)
         end
-    end
-
-    local function send_discord_preview(event_name, payload, request_ok, response)
-        if not config.discord_preview_enabled then
-            return
-        end
-
-        if not config.discord_webhook_url or config.discord_webhook_url == "" then
-            return
-        end
-
-        local encoded_payload = "{}"
-        pcall(function()
-            encoded_payload = http_service:JSONEncode(payload or {})
-        end)
-
-        local preview = encoded_payload
-        if #preview > 1700 then
-            preview = preview:sub(1, 1700) .. " ... [truncated]"
-        end
-
-        local status_code = response and response.StatusCode or "no_response"
-        local body = {
-            content = string.format(
-                "[Stella %s] ok=%s status=%s place=%s job=%s\n```json\n%s\n```",
-                tostring(event_name),
-                tostring(request_ok),
-                tostring(status_code),
-                tostring(game.PlaceId),
-                tostring(game.JobId),
-                preview
-            )
-        }
-
-        pcall(function()
-            req({
-                Url = config.discord_webhook_url,
-                Method = "POST",
-                Headers = {
-                    ["Content-Type"] = "application/json",
-                },
-                Body = http_service:JSONEncode(body),
-            })
-        end)
     end
 
     local services = setmetatable({}, {
@@ -887,15 +839,12 @@ local success, err = xpcall(function()
             debug_info("warn", "Request failed:", response)
         end
 
-        send_discord_preview("bulk", payload, success and response and response.Success, response)
-
         return success and response.Success
     end
 
     local function send_player_leave(roblox_id)
         local leave_url = config.api_url:gsub("/bulk$", "/player/leave")
-        local leave_payload = { roblox_id = roblox_id }
-        local json_payload = http_service:JSONEncode(leave_payload)
+        local json_payload = http_service:JSONEncode({ roblox_id = roblox_id })
         local timestamp = tostring(os.time())
         local sender_id = tostring(players.LocalPlayer.UserId)
         local job_id = game.JobId
@@ -922,15 +871,12 @@ local success, err = xpcall(function()
         else
             debug_info("warn", "Player leave request failed:", response)
         end
-
-        send_discord_preview("player_leave", leave_payload, success and response and response.Success, response)
     end
 
     local function send_unobserve()
         local unobserve_url = config.api_url:gsub("/bulk$", "/server/unobserve")
         local job_id = game.JobId
-        local unobserve_payload = { job_id = job_id }
-        local json_payload = http_service:JSONEncode(unobserve_payload)
+        local json_payload = http_service:JSONEncode({ job_id = job_id })
         local timestamp = tostring(os.time())
         local sender_id = tostring(players.LocalPlayer.UserId)
         local signature = generate_signature(config.api_token, timestamp, sender_id, job_id, json_payload)
@@ -956,8 +902,6 @@ local success, err = xpcall(function()
         else
             debug_info("warn", "Server unobserve request failed:", response)
         end
-
-        send_discord_preview("server_unobserve", unobserve_payload, success and response and response.Success, response)
     end
 
     local function send_batch_player_leave(roblox_ids, job_id)
@@ -993,8 +937,6 @@ local success, err = xpcall(function()
         else
             debug_info("warn", "Batch player leave request failed:", response)
         end
-
-        send_discord_preview("players_leave", payload, success and response and response.Success, response)
     end
 
     local function main()
