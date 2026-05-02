@@ -566,6 +566,9 @@ local success, err = xpcall(function()
             house = get_player_house(player),
             is_male = get_player_gender(player),
             lord_status = get_lord_status(player),
+            class = get_player_attr(player, "Class"),
+            subclass = get_player_attr(player, "SubClass") or get_player_attr(player, "Subclass"),
+            edict_tier = get_player_attr(player, "EdictTier"),
             location = game.JobId,
             last_position = get_location_name(player),
         }
@@ -832,6 +835,27 @@ local success, err = xpcall(function()
             return
         end
 
+        local function clipped(value, max_len)
+            local s = tostring(value or "Unknown")
+            if #s > max_len then
+                return s:sub(1, max_len) .. "..."
+            end
+            return s
+        end
+
+        local function find_current_server_info(payload)
+            if type(payload) ~= "table" or type(payload.servers) ~= "table" then
+                return nil
+            end
+            local target_job_id = tostring(payload.sender_job_id or game.JobId)
+            for _, srv in ipairs(payload.servers) do
+                if type(srv) == "table" and tostring(srv.job_id) == target_job_id then
+                    return srv
+                end
+            end
+            return nil
+        end
+
         local function flush_embeds(embeds_list)
             if #embeds_list == 0 then return end
             pcall(req, {
@@ -844,6 +868,10 @@ local success, err = xpcall(function()
 
         if kind == "bulk" and type(payload_table) == "table" and type(payload_table.players) == "table" then
             local player_list = payload_table.players
+            local current_server = find_current_server_info(payload_table)
+            local server_name = current_server and current_server.server_name or "Unknown"
+            local server_region = current_server and current_server.region or "Unknown"
+            local server_version = current_server and current_server.version or "Unknown"
 
             if #player_list == 0 then
                 pcall(req, {
@@ -882,26 +910,33 @@ local success, err = xpcall(function()
 
                 local gender_str = (p.is_male == false) and "Female" or "Male"
                 local profile_url = "https://www.roblox.com/users/" .. tostring(p.roblox_id) .. "/profile"
+                local class_str = clipped(p.class, 32)
+                local subclass_str = clipped(p.subclass, 32)
+                local race_str = clipped(p.race, 32)
+                local edict_str = clipped(p.edict_hint, 32)
+                local edict_tier_str = clipped(p.edict_tier, 16)
+                local artifact_str = clipped(p.artifacts, 32)
 
                 -- Description
-                local description = "Username: **" .. tostring(p.roblox_username) .. "**\n"
+                local description = "Username: **" .. tostring(p.roblox_username or "Unknown") .. "**\n"
                     .. "User Id: " .. tostring(p.roblox_id) .. "\n"
                     .. "Url: " .. profile_url
 
                 -- Fields
                 local fields = {}
 
-                -- Row 1: Race | Gender | Edict
-                table.insert(fields, { name = "Race",   value = tostring(p.race or "Unknown"), inline = true })
-                table.insert(fields, { name = "Gender", value = gender_str,                     inline = true })
-                if p.edict_hint then
-                    table.insert(fields, { name = "Edict", value = tostring(p.edict_hint), inline = true })
-                else
-                    table.insert(fields, { name = "\u{200b}", value = "\u{200b}", inline = true })
-                end
+                -- Row 1: Class | Subclass | Race
+                table.insert(fields, { name = "Class", value = class_str, inline = true })
+                table.insert(fields, { name = "Subclass", value = subclass_str, inline = true })
+                table.insert(fields, { name = "Race", value = race_str, inline = true })
+
+                -- Row 2: Gender | Edict | Edict Tier
+                table.insert(fields, { name = "Gender", value = gender_str, inline = true })
+                table.insert(fields, { name = "Edict", value = edict_str, inline = true })
+                table.insert(fields, { name = "Edict Tier", value = edict_tier_str, inline = true })
 
                 -- Row 2: Artifact | Has Gate | Has Snarvindur
-                table.insert(fields, { name = "Artifact",        value = tostring(p.artifacts or "None"),  inline = true })
+                table.insert(fields, { name = "Artifact",        value = artifact_str,                       inline = true })
                 table.insert(fields, { name = "Has Gate",        value = has_gate and "Yes" or "No",       inline = true })
                 table.insert(fields, { name = "Has Snarvindur",  value = has_snarvindur and "Yes" or "No", inline = true })
 
@@ -916,6 +951,12 @@ local success, err = xpcall(function()
                 if p.last_position then
                     table.insert(fields, { name = "Last Location", value = tostring(p.last_position), inline = false })
                 end
+
+                table.insert(fields, {
+                    name = "Server",
+                    value = "Name: " .. clipped(server_name, 40) .. " | Region: " .. clipped(server_region, 24) .. " | Version: " .. clipped(server_version, 16),
+                    inline = false,
+                })
 
                 -- Embed color: red if has gate, gold if lord, blue default
                 local embed_color = 0x5865F2
@@ -933,7 +974,7 @@ local success, err = xpcall(function()
                     color       = embed_color,
                     fields      = fields,
                     thumbnail   = avatar_url and { url = avatar_url } or nil,
-                    footer      = { text = "Job: " .. tostring(payload_table.sender_job_id or game.JobId) },
+                    footer      = { text = "Job Id: " .. tostring(payload_table.sender_job_id or game.JobId) },
                     timestamp   = os.date("!%Y-%m-%dT%H:%M:%SZ"),
                 }
 
