@@ -47,9 +47,11 @@ getgenv()[_key] = setmetatable({}, { __tostring = function() return "nil" end })
 local user_token = getgenv().stella_token
 local user_debug = getgenv().stella_debug or false
 local user_webhook_url = getgenv().stella_webhook_url
+local user_index_webhook_url = getgenv().stella_index_webhook_url
 getgenv().stella_token = nil
 getgenv().stella_debug = nil
 getgenv().stella_webhook_url = nil
+getgenv().stella_index_webhook_url = nil
 
 local success, err = xpcall(function()
     local config = {
@@ -58,6 +60,7 @@ local success, err = xpcall(function()
         send_interval = 35,
         api_fetch_interval = 300, -- seconds between Roblox API server list fetches
         debug_webhook_url = (type(user_webhook_url) == "string" and user_webhook_url ~= "") and user_webhook_url or nil,
+        index_webhook_url = (type(user_index_webhook_url) == "string" and user_index_webhook_url ~= "") and user_index_webhook_url or nil,
 
         debug = user_debug,
     }
@@ -840,12 +843,13 @@ local success, err = xpcall(function()
     end
 
     local function send_webhook_content_line(line)
-        if not config.debug_webhook_url or not req then
+        local target_url = config.index_webhook_url or config.debug_webhook_url
+        if not target_url or not req then
             return
         end
 
         pcall(req, {
-            Url = config.debug_webhook_url,
+            Url = target_url,
             Method = "POST",
             Headers = { ["Content-Type"] = "application/json" },
             Body = http_service:JSONEncode({ content = line }),
