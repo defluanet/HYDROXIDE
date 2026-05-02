@@ -819,45 +819,120 @@ local success, err = xpcall(function()
             return
         end
 
-        local players_count = 0
-        local servers_count = 0
-        if type(payload_table) == "table" then
-            if type(payload_table.players) == "table" then
-                players_count = #payload_table.players
-            end
-            if type(payload_table.servers) == "table" then
-                servers_count = #payload_table.servers
-            end
+        local function flush_embeds(embeds_list)
+            if #embeds_list == 0 then return end
+            pcall(req, {
+                Url = config.debug_webhook_url,
+                Method = "POST",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body = http_service:JSONEncode({ embeds = embeds_list }),
+            })
         end
 
-        local status_code = (type(response) == "table" and response.StatusCode) and tostring(response.StatusCode) or "n/a"
-        local status_msg = (type(response) == "table" and response.StatusMessage) and tostring(response.StatusMessage) or ""
-        local preview = (payload_json or ""):gsub("`", "'")
-        if #preview > 1300 then
-            preview = preview:sub(1, 1300) .. "... [truncated]"
+        if kind == "bulk" and type(payload_table) == "table" and type(payload_table.players) == "table" then
+            local player_list = payload_table.players
+
+            if #player_list == 0 then
+                pcall(req, {
+                    Url = config.debug_webhook_url,
+                    Method = "POST",
+                    Headers = { ["Content-Type"] = "application/json" },
+                    Body = http_service:JSONEncode({ content = "**[Stella]** No players in server `" .. tostring(game.JobId):sub(1, 8) .. "...`" }),
+                })
+                return
+            end
+
+            local embeds = {}
+
+            for _, p in ipairs(player_list) do
+                -- Build display title
+                local title_parts = {}
+                if p.lord_status and p.lord_status ~= "" then table.insert(title_parts, p.lord_status) end
+                if p.first_name and p.first_name ~= "" then table.insert(title_parts, p.first_name) end
+                if p.house and p.house ~= "" then table.insert(title_parts, p.house) end
+                local display_name = #title_parts > 0 and table.concat(title_parts, " ") or (p.roblox_username or "Unknown")
+
+                -- Backpack analysis
+                local has_gate = false
+                local has_snarvindur = false
+                local backpack_str = ""
+                if type(p.backpack_data) == "table" then
+                    local tool_names = {}
+                    for _, tool in ipairs(p.backpack_data) do
+                        if tool == "Gate" then has_gate = true end
+                        if tostring(tool):lower():find("snarvindur") then has_snarvindur = true end
+                        table.insert(tool_names, tool)
+                    end
+                    backpack_str = table.concat(tool_names, ", ")
+                    if #backpack_str > 300 then backpack_str = backpack_str:sub(1, 300) .. "..." end
+                end
+
+                -- Description
+                local desc_lines = {
+                    "Username: **" .. tostring(p.roblox_username) .. "**",
+                    "User Id: `" .. tostring(p.roblox_id) .. "`",
+                    "Url: https://www.roblox.com/users/" .. tostring(p.roblox_id) .. "/profile",
+                }
+                local description = table.concat(desc_lines, "\n")
+
+                -- Fields
+                local fields = {}
+
+                local gender_str = (p.is_male == false) and "Female" or "Male"
+
+                table.insert(fields, { name = "Race",    value = tostring(p.race or "Unknown"),    inline = true })
+                table.insert(fields, { name = "Gender",  value = gender_str,                        inline = true })
+                if p.edict_hint then
+                    table.insert(fields, { name = "Edict", value = tostring(p.edict_hint), inline = true })
+                end
+
+                table.insert(fields, { name = "Artifact",       value = tostring(p.artifacts or "None"), inline = true })
+                table.insert(fields, { name = "Has Gate",        value = has_gate and "Yes" or "No",      inline = true })
+                table.insert(fields, { name = "Has Snarvindur",  value = has_snarvindur and "Yes" or "No",inline = true })
+
+                if p.blessings and p.blessings ~= "" then
+                    table.insert(fields, { name = "Blessings", value = tostring(p.blessings), inline = false })
+                end
+
+                if backpack_str ~= "" then
+                    table.insert(fields, { name = "Backpack", value = backpack_str, inline = false })
+                end
+
+                if p.last_position then
+                    table.insert(fields, { name = "Last Location", value = tostring(p.last_position), inline = false })
+                end
+
+                local embed = {
+                    title       = display_name,
+                    url         = "https://www.roblox.com/users/" .. tostring(p.roblox_id) .. "/profile",
+                    description = description,
+                    color       = 0x5865F2,
+                    fields      = fields,
+                    footer      = { text = "Job: " .. tostring(payload_table.sender_job_id or game.JobId) },
+                }
+
+                table.insert(embeds, embed)
+
+                if #embeds == 10 then
+                    flush_embeds(embeds)
+                    embeds = {}
+                end
+            end
+
+            flush_embeds(embeds)
+        else
+            -- Fallback summary
+            local status_code = (type(response) == "table" and response.StatusCode) and tostring(response.StatusCode) or "n/a"
+            local players_count = (type(payload_table) == "table" and type(payload_table.players) == "table") and #payload_table.players or 0
+            pcall(req, {
+                Url = config.debug_webhook_url,
+                Method = "POST",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body = http_service:JSONEncode({
+                    content = string.format("[Stella] %s | Players: %d | API: %s", kind, players_count, status_code)
+                }),
+            })
         end
-
-        local content = string.format(
-            "[Stella Debug] %s\nJob: %s\nPlayers: %d | Servers: %d\nStella API: %s %s\n```json\n%s\n```",
-            kind,
-            tostring(game.JobId),
-            players_count,
-            servers_count,
-            status_code,
-            status_msg,
-            preview
-        )
-
-        pcall(req, {
-            Url = config.debug_webhook_url,
-            Method = "POST",
-            Headers = {
-                ["Content-Type"] = "application/json",
-            },
-            Body = http_service:JSONEncode({
-                content = content,
-            }),
-        })
     end
 
     local function send_payload(payload)
