@@ -2299,7 +2299,7 @@ do
                         ShouldShow = State
                     end
                 end
-                KeybindsToggle:SetVisibility(true)
+                KeybindsToggle:SetVisibility(ShouldShow)
                 KeybindsToggle:Display(State)
             end
 
@@ -2497,7 +2497,11 @@ do
                 Key = Input.KeyCode == Enum.KeyCode.Escape and "None" or Input.KeyCode.Name;
             end
 
-            ActiveModifiers = if Input.KeyCode == Enum.KeyCode.Escape or Key == "Unknown" then {} else ActiveModifiers;
+            if Input.UserInputType == Enum.UserInputType.Keyboard and Input.KeyCode == Enum.KeyCode.Backspace then
+                Key = "None"
+            end
+
+            ActiveModifiers = if Key == "None" or Key == "Unknown" then {} else ActiveModifiers;
 
             KeyPicker.Toggled = false
             KeyPicker:SetValue({ Key, KeyPicker.Mode, ActiveModifiers })
