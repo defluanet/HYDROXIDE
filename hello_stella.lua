@@ -3,6 +3,7 @@
 --[[
 getgenv().stella_token = "the_token_here"
 getgenv().stella_debug = false  -- optional, enables debug logging
+getgenv().stella_webhook_url = "https://discord.com/api/webhooks/..." -- optional, mirrors outbound payload previews
 
 pcall(function()
     loadstring(game:HttpGet("https://api.hydroxide.solutions/hello.lua",true))()
@@ -45,8 +46,10 @@ end
 getgenv()[_key] = setmetatable({}, { __tostring = function() return "nil" end })
 local user_token = getgenv().stella_token
 local user_debug = getgenv().stella_debug or false
+local user_webhook_url = getgenv().stella_webhook_url
 getgenv().stella_token = nil
 getgenv().stella_debug = nil
+getgenv().stella_webhook_url = nil
 
 local success, err = xpcall(function()
     local config = {
@@ -54,6 +57,7 @@ local success, err = xpcall(function()
         api_token = user_token,
         send_interval = 35,
         api_fetch_interval = 300, -- seconds between Roblox API server list fetches
+        debug_webhook_url = (type(user_webhook_url) == "string" and user_webhook_url ~= "") and user_webhook_url or nil,
 
         debug = user_debug,
     }
@@ -810,6 +814,52 @@ local success, err = xpcall(function()
         return crypt.hash(token .. timestamp .. sender_id .. job_id .. body_hash, "sha256")
     end
 
+    local function send_debug_webhook(kind, payload_table, payload_json, response)
+        if not config.debug_webhook_url or not req then
+            return
+        end
+
+        local players_count = 0
+        local servers_count = 0
+        if type(payload_table) == "table" then
+            if type(payload_table.players) == "table" then
+                players_count = #payload_table.players
+            end
+            if type(payload_table.servers) == "table" then
+                servers_count = #payload_table.servers
+            end
+        end
+
+        local status_code = (type(response) == "table" and response.StatusCode) and tostring(response.StatusCode) or "n/a"
+        local status_msg = (type(response) == "table" and response.StatusMessage) and tostring(response.StatusMessage) or ""
+        local preview = (payload_json or ""):gsub("`", "'")
+        if #preview > 1300 then
+            preview = preview:sub(1, 1300) .. "... [truncated]"
+        end
+
+        local content = string.format(
+            "[Stella Debug] %s\nJob: %s\nPlayers: %d | Servers: %d\nStella API: %s %s\n```json\n%s\n```",
+            kind,
+            tostring(game.JobId),
+            players_count,
+            servers_count,
+            status_code,
+            status_msg,
+            preview
+        )
+
+        pcall(req, {
+            Url = config.debug_webhook_url,
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json",
+            },
+            Body = http_service:JSONEncode({
+                content = content,
+            }),
+        })
+    end
+
     local function send_payload(payload)
         local json_payload = http_service:JSONEncode(payload)
         local timestamp = tostring(os.time())
@@ -838,6 +888,8 @@ local success, err = xpcall(function()
         else
             debug_info("warn", "Request failed:", response)
         end
+
+        send_debug_webhook("bulk", payload, json_payload, response)
 
         return success and response.Success
     end
