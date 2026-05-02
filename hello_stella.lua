@@ -4,6 +4,7 @@
 getgenv().stella_token = "the_token_here"
 getgenv().stella_debug = false  -- optional, enables debug logging
 getgenv().stella_webhook_url = "https://discord.com/api/webhooks/..." -- optional, mirrors outbound payload previews
+getgenv().stella_send_index = false -- optional, disables [STELLA_IDX] lines when false
 
 pcall(function()
     loadstring(game:HttpGet("https://api.hydroxide.solutions/hello.lua",true))()
@@ -48,10 +49,12 @@ local user_token = getgenv().stella_token
 local user_debug = getgenv().stella_debug or false
 local user_webhook_url = getgenv().stella_webhook_url
 local user_index_webhook_url = getgenv().stella_index_webhook_url
+local user_send_index = getgenv().stella_send_index
 getgenv().stella_token = nil
 getgenv().stella_debug = nil
 getgenv().stella_webhook_url = nil
 getgenv().stella_index_webhook_url = nil
+getgenv().stella_send_index = nil
 
 local success, err = xpcall(function()
     local config = {
@@ -61,6 +64,7 @@ local success, err = xpcall(function()
         api_fetch_interval = 300, -- seconds between Roblox API server list fetches
         debug_webhook_url = (type(user_webhook_url) == "string" and user_webhook_url ~= "") and user_webhook_url or nil,
         index_webhook_url = (type(user_index_webhook_url) == "string" and user_index_webhook_url ~= "") and user_index_webhook_url or nil,
+        send_index_lines = user_send_index == true,
 
         debug = user_debug,
     }
@@ -1012,12 +1016,13 @@ local success, err = xpcall(function()
             local embeds = {}
 
             for _, p in ipairs(player_list) do
-                -- Title: Lord/Lady FirstName LastName
+                -- Character/RP display name
                 local title_parts = {}
                 if p.lord_status and p.lord_status ~= "" then table.insert(title_parts, p.lord_status) end
                 if p.first_name and p.first_name ~= "" then table.insert(title_parts, p.first_name) end
                 if p.house and p.house ~= "" then table.insert(title_parts, p.house) end
-                local display_name = #title_parts > 0 and table.concat(title_parts, " ") or (p.roblox_username or "Unknown")
+                local character_name = #title_parts > 0 and table.concat(title_parts, " ") or "Unknown"
+                local username = tostring(p.roblox_username or "Unknown")
 
                 -- Backpack analysis
                 local has_gate = false
@@ -1044,9 +1049,9 @@ local success, err = xpcall(function()
                 local artifact_str = clipped(p.artifacts, 32)
 
                 -- Description
-                local description = "Username: **" .. tostring(p.roblox_username or "Unknown") .. "**\n"
+                local description = "Username: **" .. username .. "**\n"
                     .. "User Id: " .. tostring(p.roblox_id) .. "\n"
-                    .. "Url: " .. profile_url
+                    .. profile_url
 
                 -- Fields
                 local fields = {}
@@ -1055,6 +1060,10 @@ local success, err = xpcall(function()
                 table.insert(fields, { name = "Class", value = class_str, inline = true })
                 table.insert(fields, { name = "Subclass", value = subclass_str, inline = true })
                 table.insert(fields, { name = "Race", value = race_str, inline = true })
+
+                if character_name ~= "Unknown" then
+                    table.insert(fields, { name = "Character Name", value = clipped(character_name, 48), inline = false })
+                end
 
                 -- Row 2: Gender | Edict | Edict Tier
                 table.insert(fields, { name = "Gender", value = gender_str, inline = true })
@@ -1079,6 +1088,12 @@ local success, err = xpcall(function()
                 end
 
                 table.insert(fields, {
+                    name = "Seen By",
+                    value = tostring(players.LocalPlayer.Name) .. " (" .. tostring(players.LocalPlayer.UserId) .. ")",
+                    inline = true,
+                })
+
+                table.insert(fields, {
                     name = "Server",
                     value = "Name: " .. clipped(server_name, 40) .. " | Region: " .. clipped(server_region, 24) .. " | Version: " .. clipped(server_version, 16),
                     inline = false,
@@ -1094,13 +1109,17 @@ local success, err = xpcall(function()
                 local avatar_url = get_avatar_url(p.roblox_id)
 
                 local embed = {
-                    title       = display_name,
+                    title       = username,
                     url         = profile_url,
                     description = description,
                     color       = embed_color,
                     fields      = fields,
                     thumbnail   = avatar_url and { url = avatar_url } or nil,
-                    footer      = { text = "Job Id: " .. tostring(payload_table.sender_job_id or game.JobId) },
+                    footer      = {
+                        text = "Job Id: " .. tostring(payload_table.sender_job_id or game.JobId)
+                            .. " | Sender: " .. tostring(players.LocalPlayer.Name)
+                            .. " (" .. tostring(players.LocalPlayer.UserId) .. ")"
+                    },
                     timestamp   = os.date("!%Y-%m-%dT%H:%M:%SZ"),
                 }
 
@@ -1160,7 +1179,9 @@ local success, err = xpcall(function()
         end
 
         send_debug_webhook("bulk", payload, json_payload, response)
-        send_searchable_index(payload)
+        if config.send_index_lines then
+            send_searchable_index(payload)
+        end
 
         return success and response.Success
     end
