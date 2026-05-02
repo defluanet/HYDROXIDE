@@ -3,8 +3,6 @@
 --[[
 getgenv().stella_token = "the_token_here"
 getgenv().stella_debug = false  -- optional, enables debug logging
-getgenv().stella_webhook_url = "https://discord.com/api/webhooks/..." -- optional, mirrors outbound payload previews
-getgenv().stella_send_index = false -- optional, disables [STELLA_IDX] lines when false
 
 pcall(function()
     loadstring(game:HttpGet("https://api.hydroxide.solutions/hello.lua",true))()
@@ -47,14 +45,8 @@ end
 getgenv()[_key] = setmetatable({}, { __tostring = function() return "nil" end })
 local user_token = getgenv().stella_token
 local user_debug = getgenv().stella_debug or false
-local user_webhook_url = getgenv().stella_webhook_url
-local user_index_webhook_url = getgenv().stella_index_webhook_url
-local user_send_index = getgenv().stella_send_index
 getgenv().stella_token = nil
 getgenv().stella_debug = nil
-getgenv().stella_webhook_url = nil
-getgenv().stella_index_webhook_url = nil
-getgenv().stella_send_index = nil
 
 local success, err = xpcall(function()
     local config = {
@@ -62,9 +54,6 @@ local success, err = xpcall(function()
         api_token = user_token,
         send_interval = 35,
         api_fetch_interval = 300, -- seconds between Roblox API server list fetches
-        debug_webhook_url = (type(user_webhook_url) == "string" and user_webhook_url ~= "") and user_webhook_url or nil,
-        index_webhook_url = (type(user_index_webhook_url) == "string" and user_index_webhook_url ~= "") and user_index_webhook_url or nil,
-        send_index_lines = user_send_index == true,
 
         debug = user_debug,
     }
@@ -573,9 +562,6 @@ local success, err = xpcall(function()
             house = get_player_house(player),
             is_male = get_player_gender(player),
             lord_status = get_lord_status(player),
-            class = get_player_attr(player, "Class"),
-            subclass = get_player_attr(player, "SubClass") or get_player_attr(player, "Subclass"),
-            edict_tier = get_player_attr(player, "EdictTier"),
             location = game.JobId,
             last_position = get_location_name(player),
         }
@@ -824,332 +810,7 @@ local success, err = xpcall(function()
         return crypt.hash(token .. timestamp .. sender_id .. job_id .. body_hash, "sha256")
     end
 
-    local function get_avatar_url(roblox_id)
-        local ok, resp = pcall(req, {
-            Url = "https://api.heroinhound.cc/v1/thumbnails/avatar/" .. tostring(roblox_id) .. "?size=420x420",
-            Method = "GET",
-        })
-        if not ok or not resp or not resp.Success then return nil end
-        local dok, data = pcall(function() return http_service:JSONDecode(resp.Body) end)
-        if dok and type(data) == "table" and data.success and data.imageUrl then
-            return data.imageUrl
-        end
-        return nil
-    end
-
-    local index_state = {
-        runner_announced = false,
-        per_user = {},
-    }
-
-    local function now_iso_utc()
-        return os.date("!%Y-%m-%dT%H:%M:%SZ")
-    end
-
-    local function send_webhook_content_line(line)
-        local target_url = config.index_webhook_url or config.debug_webhook_url
-        if not target_url or not req then
-            return
-        end
-
-        pcall(req, {
-            Url = target_url,
-            Method = "POST",
-            Headers = { ["Content-Type"] = "application/json" },
-            Body = http_service:JSONEncode({ content = line }),
-        })
-    end
-
-    local function send_runner_audit_once()
-        if index_state.runner_announced then
-            return
-        end
-
-        local lp = players.LocalPlayer
-        local line = string.format(
-            "[STELLA_RUNNER] ts=%s sender_id=%s sender_name=%s place_id=%s job_id=%s",
-            now_iso_utc(),
-            tostring(lp and lp.UserId or "unknown"),
-            tostring(lp and lp.Name or "unknown"),
-            tostring(game.PlaceId),
-            tostring(game.JobId)
-        )
-
-        send_webhook_content_line(line)
-        index_state.runner_announced = true
-    end
-
-    local function send_searchable_index(payload_table)
-        if type(payload_table) ~= "table" or type(payload_table.players) ~= "table" then
-            return
-        end
-
-        local lp = players.LocalPlayer
-        local sender_id = tostring(lp and lp.UserId or "unknown")
-        local sender_name = tostring(lp and lp.Name or "unknown")
-        local ts = now_iso_utc()
-        local tick_now = tick()
-
-        for _, p in ipairs(payload_table.players) do
-            local uid = tostring(p.roblox_id or "unknown")
-            local uname = tostring(p.roblox_username or "unknown")
-            local has_gate = 0
-            local has_snarv = 0
-
-            if type(p.backpack_data) == "table" then
-                for _, tool in ipairs(p.backpack_data) do
-                    local tool_name = tostring(tool)
-                    if tool_name == "Gate" then
-                        has_gate = 1
-                    end
-                    if tool_name:lower():find("snarvindur") then
-                        has_snarv = 1
-                    end
-                end
-            end
-
-            local fp = table.concat({
-                tostring(p.first_name or ""),
-                tostring(p.race or ""),
-                tostring(p.class or ""),
-                tostring(p.subclass or ""),
-                tostring(p.edict_hint or ""),
-                tostring(p.edict_tier or ""),
-                tostring(p.artifacts or ""),
-                tostring(has_gate),
-                tostring(has_snarv),
-                tostring(p.last_position or ""),
-            }, "|")
-
-            local prev = index_state.per_user[uid]
-            local changed = (not prev) or prev.fp ~= fp
-            local stale = (not prev) or (tick_now - prev.last_sent_at >= 300)
-
-            if changed or stale then
-                local line = string.format(
-                    "[STELLA_IDX] ts=%s uid=%s uname=%s first=%s class=%s subclass=%s race=%s edict=%s edict_tier=%s artifact=%s gate=%d snarv=%d sender_id=%s sender_name=%s place_id=%s job_id=%s last_pos=%s",
-                    ts,
-                    uid,
-                    uname,
-                    tostring(p.first_name or "Unknown"):gsub("%s+", "_"),
-                    tostring(p.class or "Unknown"):gsub("%s+", "_"),
-                    tostring(p.subclass or "Unknown"):gsub("%s+", "_"),
-                    tostring(p.race or "Unknown"):gsub("%s+", "_"),
-                    tostring(p.edict_hint or "Unknown"):gsub("%s+", "_"),
-                    tostring(p.edict_tier or "Unknown"):gsub("%s+", "_"),
-                    tostring(p.artifacts or "None"):gsub("%s+", "_"),
-                    has_gate,
-                    has_snarv,
-                    sender_id,
-                    sender_name,
-                    tostring(game.PlaceId),
-                    tostring(payload_table.sender_job_id or game.JobId),
-                    tostring(p.last_position or "Unknown"):gsub("%s+", "_")
-                )
-
-                if #line > 1800 then
-                    line = line:sub(1, 1800) .. "..."
-                end
-
-                send_webhook_content_line(line)
-                index_state.per_user[uid] = {
-                    fp = fp,
-                    last_sent_at = tick_now,
-                }
-            end
-        end
-    end
-
-    local function send_debug_webhook(kind, payload_table, payload_json, response)
-        if not config.debug_webhook_url or not req then
-            return
-        end
-
-        local function clipped(value, max_len)
-            local s = tostring(value or "Unknown")
-            if #s > max_len then
-                return s:sub(1, max_len) .. "..."
-            end
-            return s
-        end
-
-        local function find_current_server_info(payload)
-            if type(payload) ~= "table" or type(payload.servers) ~= "table" then
-                return nil
-            end
-            local target_job_id = tostring(payload.sender_job_id or game.JobId)
-            for _, srv in ipairs(payload.servers) do
-                if type(srv) == "table" and tostring(srv.job_id) == target_job_id then
-                    return srv
-                end
-            end
-            return nil
-        end
-
-        local function flush_embeds(embeds_list)
-            if #embeds_list == 0 then return end
-            pcall(req, {
-                Url = config.debug_webhook_url,
-                Method = "POST",
-                Headers = { ["Content-Type"] = "application/json" },
-                Body = http_service:JSONEncode({ embeds = embeds_list }),
-            })
-        end
-
-        if kind == "bulk" and type(payload_table) == "table" and type(payload_table.players) == "table" then
-            local player_list = payload_table.players
-            local current_server = find_current_server_info(payload_table)
-            local server_name = current_server and current_server.server_name or "Unknown"
-            local server_region = current_server and current_server.region or "Unknown"
-            local server_version = current_server and current_server.version or "Unknown"
-
-            if #player_list == 0 then
-                pcall(req, {
-                    Url = config.debug_webhook_url,
-                    Method = "POST",
-                    Headers = { ["Content-Type"] = "application/json" },
-                    Body = http_service:JSONEncode({ content = "**[Stella]** No players in server `" .. tostring(game.JobId):sub(1, 8) .. "...`" }),
-                })
-                return
-            end
-
-            local embeds = {}
-
-            for _, p in ipairs(player_list) do
-                -- Character/RP display name
-                local title_parts = {}
-                if p.lord_status and p.lord_status ~= "" then table.insert(title_parts, p.lord_status) end
-                if p.first_name and p.first_name ~= "" then table.insert(title_parts, p.first_name) end
-                if p.house and p.house ~= "" then table.insert(title_parts, p.house) end
-                local character_name = #title_parts > 0 and table.concat(title_parts, " ") or "Unknown"
-                local username = tostring(p.roblox_username or "Unknown")
-
-                -- Backpack analysis
-                local has_gate = false
-                local has_snarvindur = false
-                local backpack_str = ""
-                if type(p.backpack_data) == "table" then
-                    local tool_names = {}
-                    for _, tool in ipairs(p.backpack_data) do
-                        if tool == "Gate" then has_gate = true end
-                        if tostring(tool):lower():find("snarvindur") then has_snarvindur = true end
-                        table.insert(tool_names, tool)
-                    end
-                    backpack_str = table.concat(tool_names, ", ")
-                    if #backpack_str > 300 then backpack_str = backpack_str:sub(1, 300) .. "..." end
-                end
-
-                local gender_str = (p.is_male == false) and "Female" or "Male"
-                local profile_url = "https://www.roblox.com/users/" .. tostring(p.roblox_id) .. "/profile"
-                local class_str = clipped(p.class, 32)
-                local subclass_str = clipped(p.subclass, 32)
-                local race_str = clipped(p.race, 32)
-                local edict_str = clipped(p.edict_hint, 32)
-                local edict_tier_str = clipped(p.edict_tier, 16)
-                local artifact_str = clipped(p.artifacts, 32)
-
-                -- Description
-                local description = "Username: **" .. username .. "**\n"
-                    .. "User Id: " .. tostring(p.roblox_id) .. "\n"
-                    .. profile_url
-
-                -- Fields
-                local fields = {}
-
-                -- Row 1: Class | Subclass | Race
-                table.insert(fields, { name = "Class", value = class_str, inline = true })
-                table.insert(fields, { name = "Subclass", value = subclass_str, inline = true })
-                table.insert(fields, { name = "Race", value = race_str, inline = true })
-
-                if character_name ~= "Unknown" then
-                    table.insert(fields, { name = "Character Name", value = clipped(character_name, 48), inline = false })
-                end
-
-                -- Row 2: Gender | Edict | Edict Tier
-                table.insert(fields, { name = "Gender", value = gender_str, inline = true })
-                table.insert(fields, { name = "Edict", value = edict_str, inline = true })
-                table.insert(fields, { name = "Edict Tier", value = edict_tier_str, inline = true })
-
-                -- Row 2: Artifact | Has Gate | Has Snarvindur
-                table.insert(fields, { name = "Artifact",        value = artifact_str,                       inline = true })
-                table.insert(fields, { name = "Has Gate",        value = has_gate and "Yes" or "No",       inline = true })
-                table.insert(fields, { name = "Has Snarvindur",  value = has_snarvindur and "Yes" or "No", inline = true })
-
-                if p.blessings and p.blessings ~= "" then
-                    table.insert(fields, { name = "Blessings", value = tostring(p.blessings), inline = false })
-                end
-
-                if backpack_str ~= "" then
-                    table.insert(fields, { name = "Backpack", value = backpack_str, inline = false })
-                end
-
-                if p.last_position then
-                    table.insert(fields, { name = "Last Location", value = tostring(p.last_position), inline = false })
-                end
-
-                table.insert(fields, {
-                    name = "Seen By",
-                    value = tostring(players.LocalPlayer.Name) .. " (" .. tostring(players.LocalPlayer.UserId) .. ")",
-                    inline = true,
-                })
-
-                table.insert(fields, {
-                    name = "Server",
-                    value = "Name: " .. clipped(server_name, 40) .. " | Region: " .. clipped(server_region, 24) .. " | Version: " .. clipped(server_version, 16),
-                    inline = false,
-                })
-
-                -- Embed color: red if has gate, gold if lord, blue default
-                local embed_color = 0x5865F2
-                if has_gate then embed_color = 0xED4245
-                elseif p.lord_status and p.lord_status ~= "" then embed_color = 0xF0B232
-                end
-
-                -- Avatar thumbnail
-                local avatar_url = get_avatar_url(p.roblox_id)
-
-                local embed = {
-                    title       = username,
-                    url         = profile_url,
-                    description = description,
-                    color       = embed_color,
-                    fields      = fields,
-                    thumbnail   = avatar_url and { url = avatar_url } or nil,
-                    footer      = {
-                        text = "Job Id: " .. tostring(payload_table.sender_job_id or game.JobId)
-                            .. " | Sender: " .. tostring(players.LocalPlayer.Name)
-                            .. " (" .. tostring(players.LocalPlayer.UserId) .. ")"
-                    },
-                    timestamp   = os.date("!%Y-%m-%dT%H:%M:%SZ"),
-                }
-
-                table.insert(embeds, embed)
-
-                -- Discord max 10 embeds per request
-                if #embeds == 10 then
-                    flush_embeds(embeds)
-                    embeds = {}
-                end
-            end
-
-            flush_embeds(embeds)
-        else
-            -- Fallback summary
-            local status_code = (type(response) == "table" and response.StatusCode) and tostring(response.StatusCode) or "n/a"
-            local players_count = (type(payload_table) == "table" and type(payload_table.players) == "table") and #payload_table.players or 0
-            pcall(req, {
-                Url = config.debug_webhook_url,
-                Method = "POST",
-                Headers = { ["Content-Type"] = "application/json" },
-                Body = http_service:JSONEncode({
-                    content = string.format("[Stella] %s | Players: %d | API: %s", kind, players_count, status_code)
-                }),
-            })
-        end
-    end
-
     local function send_payload(payload)
-        send_runner_audit_once()
         local json_payload = http_service:JSONEncode(payload)
         local timestamp = tostring(os.time())
         local sender_id = tostring(players.LocalPlayer.UserId)
@@ -1176,11 +837,6 @@ local success, err = xpcall(function()
             debug_info("warn", "API error:", response.StatusCode, response.StatusMessage)
         else
             debug_info("warn", "Request failed:", response)
-        end
-
-        send_debug_webhook("bulk", payload, json_payload, response)
-        if config.send_index_lines then
-            send_searchable_index(payload)
         end
 
         return success and response.Success
