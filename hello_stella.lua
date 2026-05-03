@@ -31,8 +31,15 @@ local function generate_key()
     return table.concat(chars)
 end
 
-if not getgenv().stella_token then
-    warn("Stella | stella_token not set! Set getgenv().stella_token before loading.")
+local user_debug = getgenv().stella_debug or false
+local user_webhook = getgenv().stella_webhook or getgenv().stella_webhook_url
+local user_webhook_queue = getgenv().stella_webhook_queue
+local user_alert_targets = getgenv().stella_alert_targets
+local user_brand_name = getgenv().stella_brand_name
+local user_brand_icon = getgenv().stella_brand_icon
+
+if (not user_webhook or user_webhook == "") then
+    warn("Stella | Set getgenv().stella_webhook before loading.")
     return
 end
 
@@ -43,15 +50,24 @@ if getgenv()[_key] and type(getgenv()[_key]) == "table" then
 end
 
 getgenv()[_key] = setmetatable({}, { __tostring = function() return "nil" end })
-local user_token = getgenv().stella_token
-local user_debug = getgenv().stella_debug or false
 getgenv().stella_token = nil
 getgenv().stella_debug = nil
+getgenv().stella_webhook = nil
+getgenv().stella_webhook_url = nil
+getgenv().stella_webhook_queue = nil
+getgenv().stella_alert_targets = nil
+getgenv().stella_brand_name = nil
+getgenv().stella_brand_icon = nil
 
 local success, err = xpcall(function()
     local config = {
-        api_url = "https://stella.heroinhound.cc/api/bulk",
-        api_token = user_token,
+        webhook_url = user_webhook,
+        webhook_use_queue = user_webhook_queue ~= false,
+        alert_targets = type(user_alert_targets) == "table" and user_alert_targets or {},
+        brand_name = (type(user_brand_name) == "string" and user_brand_name ~= "") and user_brand_name or "Hydroxide Intelligence",
+        brand_icon = (type(user_brand_icon) == "string" and user_brand_icon ~= "") and user_brand_icon or nil,
+        snapshot_cooldown = 45,
+
         send_interval = 35,
         api_fetch_interval = 300, -- seconds between Roblox API server list fetches
 
@@ -87,6 +103,15 @@ local success, err = xpcall(function()
     local players = services.Players
     local replicated_storage = services.ReplicatedStorage
     local workspace = services.Workspace
+
+    local player_embed_cache = {}
+    local server_embed_signature = nil
+
+    if type(config.webhook_url) == "string" and config.webhook_url ~= "" and config.webhook_use_queue then
+        if config.webhook_url:find("/api/webhooks/") and not config.webhook_url:find("/queue") then
+            config.webhook_url = config.webhook_url .. "/queue"
+        end
+    end
 
     local race_colors = {}
     local race_eye_colors = {}
@@ -805,138 +830,246 @@ local success, err = xpcall(function()
         }
     end
 
-    local function generate_signature(token, timestamp, sender_id, job_id, body)
-        local body_hash = crypt.hash(body, "sha256")
-        return crypt.hash(token .. timestamp .. sender_id .. job_id .. body_hash, "sha256")
-    end
+    local function json_post(url, payload)
+        if not url or url == "" then
+            return false
+        end
 
-    local function send_payload(payload)
-        local json_payload = http_service:JSONEncode(payload)
-        local timestamp = tostring(os.time())
-        local sender_id = tostring(players.LocalPlayer.UserId)
-        local job_id = game.JobId
-        local signature = generate_signature(config.api_token, timestamp, sender_id, job_id, json_payload)
-
+        local encoded = http_service:JSONEncode(payload)
         local success, response = pcall(req, {
-            Url = config.api_url,
+            Url = url,
             Method = "POST",
             Headers = {
                 ["Content-Type"] = "application/json",
-                ["Authorization"] = "Bearer " .. config.api_token,
-                ["X-Timestamp"] = timestamp,
-                ["X-Sender-ID"] = sender_id,
-                ["X-Job-ID"] = job_id,
-                ["X-Signature"] = signature,
             },
-            Body = json_payload,
+            Body = encoded,
         })
 
-        if success and response.Success then
-            debug_info("print", "Data sent successfully:", response.Body)
-        elseif success then
-            debug_info("warn", "API error:", response.StatusCode, response.StatusMessage)
-        else
-            debug_info("warn", "Request failed:", response)
+        if success and response and response.Success then
+            return true
         end
 
-        return success and response.Success
+        if success and response then
+            debug_info("warn", "Webhook API error:", response.StatusCode, response.StatusMessage)
+        else
+            debug_info("warn", "Webhook request failed:", tostring(response))
+        end
+        return false
     end
 
-    local function send_player_leave(roblox_id)
-        local leave_url = config.api_url:gsub("/bulk$", "/player/leave")
-        local json_payload = http_service:JSONEncode({ roblox_id = roblox_id })
-        local timestamp = tostring(os.time())
-        local sender_id = tostring(players.LocalPlayer.UserId)
-        local job_id = game.JobId
-        local signature = generate_signature(config.api_token, timestamp, sender_id, job_id, json_payload)
-
-        local success, response = pcall(req, {
-            Url = leave_url,
-            Method = "POST",
-            Headers = {
-                ["Content-Type"] = "application/json",
-                ["Authorization"] = "Bearer " .. config.api_token,
-                ["X-Timestamp"] = timestamp,
-                ["X-Sender-ID"] = sender_id,
-                ["X-Job-ID"] = job_id,
-                ["X-Signature"] = signature,
-            },
-            Body = json_payload,
-        })
-
-        if success and response.Success then
-            debug_info("print", "Player leave sent for:", roblox_id)
-        elseif success then
-            debug_info("warn", "Player leave API error:", response.StatusCode)
-        else
-            debug_info("warn", "Player leave request failed:", response)
+    local function has_tool(tools, keyword)
+        if type(tools) ~= "table" then return false end
+        local needle = string.lower(keyword)
+        for _, tool_name in ipairs(tools) do
+            if type(tool_name) == "string" and string.find(string.lower(tool_name), needle, 1, true) then
+                return true
+            end
         end
+        return false
     end
 
-    local function send_unobserve()
-        local unobserve_url = config.api_url:gsub("/bulk$", "/server/unobserve")
-        local job_id = game.JobId
-        local json_payload = http_service:JSONEncode({ job_id = job_id })
-        local timestamp = tostring(os.time())
-        local sender_id = tostring(players.LocalPlayer.UserId)
-        local signature = generate_signature(config.api_token, timestamp, sender_id, job_id, json_payload)
-
-        local success, response = pcall(req, {
-            Url = unobserve_url,
-            Method = "POST",
-            Headers = {
-                ["Content-Type"] = "application/json",
-                ["Authorization"] = "Bearer " .. config.api_token,
-                ["X-Timestamp"] = timestamp,
-                ["X-Sender-ID"] = sender_id,
-                ["X-Job-ID"] = job_id,
-                ["X-Signature"] = signature,
-            },
-            Body = json_payload,
-        })
-
-        if success and response.Success then
-            debug_info("print", "Server unobserve sent for:", game.JobId)
-        elseif success then
-            debug_info("warn", "Server unobserve API error:", response.StatusCode)
-        else
-            debug_info("warn", "Server unobserve request failed:", response)
-        end
+    local function infer_player_flags(player_data)
+        local has_gate = has_tool(player_data.backpack_data, "gate")
+        local has_snarv = has_tool(player_data.backpack_data, "snarv") or has_tool(player_data.backpack_data, "snarvindur")
+        return has_gate and "Yes" or "No", has_snarv and "Yes" or "No"
     end
 
-    local function send_batch_player_leave(roblox_ids, job_id)
-        local batch_url = config.api_url:gsub("/bulk$", "/players/leave")
-        local payload = { roblox_ids = roblox_ids }
-        if job_id then
-            payload.job_id = job_id
+    local function to_inline(value)
+        if value == nil then
+            return "Unknown"
         end
-        local json_payload = http_service:JSONEncode(payload)
-        local timestamp = tostring(os.time())
-        local sender_id = tostring(players.LocalPlayer.UserId)
-        local sig_job_id = game.JobId
-        local signature = generate_signature(config.api_token, timestamp, sender_id, sig_job_id, json_payload)
+        local text = tostring(value)
+        if text == "" then
+            return "Unknown"
+        end
+        return text
+    end
 
-        local success, response = pcall(req, {
-            Url = batch_url,
-            Method = "POST",
-            Headers = {
-                ["Content-Type"] = "application/json",
-                ["Authorization"] = "Bearer " .. config.api_token,
-                ["X-Timestamp"] = timestamp,
-                ["X-Sender-ID"] = sender_id,
-                ["X-Job-ID"] = sig_job_id,
-                ["X-Signature"] = signature,
+    local function build_runner_embed()
+        local local_player = players.LocalPlayer
+        return {
+            title = "Script Runner",
+            color = 0xF59E0B,
+            author = {
+                name = config.brand_name,
+                icon_url = config.brand_icon,
             },
-            Body = json_payload,
-        })
+            fields = {
+                { name = "Username", value = to_inline(local_player and local_player.Name), inline = true },
+                { name = "User Id", value = to_inline(local_player and local_player.UserId), inline = true },
+                { name = "Place Id", value = to_inline(game.PlaceId), inline = true },
+                { name = "Server Job Id", value = to_inline(game.JobId), inline = false },
+                { name = "Status", value = "Started", inline = true },
+            },
+            footer = {
+                text = config.brand_name .. " • Runner Event",
+            },
+            timestamp = DateTime.now():ToIsoDate(),
+        }
+    end
 
-        if success and response.Success then
-            debug_info("print", "Batch player leave sent for", #roblox_ids, "players")
-        elseif success then
-            debug_info("warn", "Batch player leave API error:", response.StatusCode)
-        else
-            debug_info("warn", "Batch player leave request failed:", response)
+    local function build_server_embed(payload)
+        local names = {}
+        for _, entry in ipairs(payload.players or {}) do
+            local username = entry.roblox_username or "Unknown"
+            local uid = entry.roblox_id or "?"
+            table.insert(names, string.format("%s (%s)", username, tostring(uid)))
+            if #names >= 20 then
+                break
+            end
         end
+
+        local players_value = #names > 0 and table.concat(names, "\n") or "No observed players"
+        return {
+            title = "Server Snapshot",
+            color = 0x2563EB,
+            author = {
+                name = config.brand_name,
+                icon_url = config.brand_icon,
+            },
+            fields = {
+                { name = "Place Id", value = to_inline(game.PlaceId), inline = true },
+                { name = "Server Job Id", value = to_inline(game.JobId), inline = true },
+                { name = "Observed Players", value = tostring(#(payload.players or {})), inline = true },
+                { name = "Players", value = players_value, inline = false },
+            },
+            footer = {
+                text = config.brand_name .. " • Server Event",
+            },
+            timestamp = DateTime.now():ToIsoDate(),
+        }
+    end
+
+    local function is_tracked_player(player_data)
+        local uid = tostring(player_data.roblox_id or "")
+        local uname = string.lower(tostring(player_data.roblox_username or ""))
+        local fname = string.lower(tostring(player_data.first_name or ""))
+
+        for _, target in ipairs(config.alert_targets) do
+            local text = tostring(target)
+            if text == uid then
+                return true
+            end
+
+            local lowered = string.lower(text)
+            if lowered == uname or lowered == fname then
+                return true
+            end
+        end
+
+        return false
+    end
+
+    local function build_player_embed(player_data, is_alert)
+        local profile_url = string.format("https://www.roblox.com/users/%s/profile", tostring(player_data.roblox_id or "0"))
+        local has_gate, has_snarv = infer_player_flags(player_data)
+        local gender = player_data.is_male == false and "Female" or "Male"
+
+        local embed = {
+            title = string.format("%s%s", is_alert and "ALERT • " or "Player Seen • ", to_inline(player_data.roblox_username)),
+            description = string.format(
+                "Username: **%s**\nUser Id: %s\n%s",
+                to_inline(player_data.roblox_username),
+                to_inline(player_data.roblox_id),
+                profile_url
+            ),
+            url = profile_url,
+            color = is_alert and 0xDC2626 or 0x10B981,
+            author = {
+                name = config.brand_name,
+                icon_url = config.brand_icon,
+            },
+            fields = {
+                { name = "Race", value = to_inline(player_data.race), inline = true },
+                { name = "Class", value = "Unknown", inline = true },
+                { name = "Subclass", value = "Unknown", inline = true },
+                { name = "Gender", value = gender, inline = true },
+                { name = "Edict", value = to_inline(player_data.edict_hint), inline = true },
+                { name = "Edict Tier", value = "Unknown", inline = true },
+                { name = "Artifact", value = to_inline(player_data.artifacts), inline = true },
+                { name = "Has Gate", value = has_gate, inline = true },
+                { name = "Has Snarvindur", value = has_snarv, inline = true },
+                { name = "Last Location", value = to_inline(player_data.last_position), inline = false },
+                {
+                    name = "Seen By",
+                    value = string.format("%s (%s)", to_inline(players.LocalPlayer and players.LocalPlayer.Name), to_inline(players.LocalPlayer and players.LocalPlayer.UserId)),
+                    inline = true
+                },
+                { name = "Server Job Id", value = to_inline(player_data.location or game.JobId), inline = false },
+            },
+            footer = {
+                text = string.format(
+                    "%s • Updated: %s | Job Id: %s | Sender: %s (%s)",
+                    config.brand_name,
+                    os.date("!%Y-%m-%dT%H:%M:%SZ"),
+                    to_inline(player_data.location or game.JobId),
+                    to_inline(players.LocalPlayer and players.LocalPlayer.Name),
+                    to_inline(players.LocalPlayer and players.LocalPlayer.UserId)
+                )
+            },
+            timestamp = DateTime.now():ToIsoDate(),
+        }
+
+        return embed
+    end
+
+    local function send_webhook_embeds(embeds)
+        if not config.webhook_url or config.webhook_url == "" then
+            return false
+        end
+
+        return json_post(config.webhook_url, {
+            username = config.brand_name,
+            avatar_url = config.brand_icon,
+            embeds = embeds,
+        })
+    end
+
+    local function maybe_send_server_embed(payload)
+        if not config.webhook_url or config.webhook_url == "" then
+            return
+        end
+
+        local signature = tostring(#(payload.players or {}))
+        if signature == server_embed_signature then
+            return
+        end
+
+        server_embed_signature = signature
+        send_webhook_embeds({ build_server_embed(payload) })
+    end
+
+    local function maybe_send_player_embed(player_data)
+        if not config.webhook_url or config.webhook_url == "" then
+            return
+        end
+
+        local now = os.time()
+        local uid = tostring(player_data.roblox_id or "")
+        if uid == "" then
+            return
+        end
+
+        local signature = table.concat({
+            tostring(player_data.roblox_username or ""),
+            tostring(player_data.race or ""),
+            tostring(player_data.edict_hint or ""),
+            tostring(player_data.artifacts or ""),
+            tostring(player_data.last_position or ""),
+        }, "|")
+
+        local cached = player_embed_cache[uid]
+        if cached and cached.signature == signature and (now - cached.sent_at) < config.snapshot_cooldown then
+            return
+        end
+
+        player_embed_cache[uid] = {
+            signature = signature,
+            sent_at = now,
+        }
+
+        local is_alert = is_tracked_player(player_data)
+        send_webhook_embeds({ build_player_embed(player_data, is_alert) })
     end
 
     local function main()
@@ -945,10 +1078,19 @@ local success, err = xpcall(function()
 
         init_race_colors()
 
+        if config.webhook_url and config.webhook_url ~= "" then
+            send_webhook_embeds({ build_runner_embed() })
+        end
+
         while true do
             local payload = collect_all_data()
             debug_info("print", "Collected", #payload.players, "players")
-            send_payload(payload)
+
+            maybe_send_server_embed(payload)
+            for _, player_data in ipairs(payload.players) do
+                maybe_send_player_embed(player_data)
+            end
+
             task.wait(config.send_interval)
         end
     end
@@ -958,7 +1100,10 @@ local success, err = xpcall(function()
     players.PlayerAdded:Connect(function(player)
         task.wait(5)
         local payload = collect_all_data()
-        send_payload(payload)
+        maybe_send_server_embed(payload)
+        for _, player_data in ipairs(payload.players) do
+            maybe_send_player_embed(player_data)
+        end
     end)
 
     local server_leaving = false
@@ -969,24 +1114,19 @@ local success, err = xpcall(function()
         end
 
         if player == players.LocalPlayer then
-            -- Leaving server: batch-clear all players + unobserve in one request
+            -- Leaving server: stop single-departure sends.
             server_leaving = true
-            local roblox_ids = {}
-            for _, p in ipairs(players:GetPlayers()) do
-                table.insert(roblox_ids, p.UserId)
-            end
-            send_batch_player_leave(roblox_ids, game.JobId)
             return
         end
 
         -- Normal single-player departure (skip if server is shutting down)
         if server_leaving then return end
-        task.spawn(function()
-            send_player_leave(player.UserId)
-        end)
         task.wait(1)
         local payload = collect_all_data()
-        send_payload(payload)
+        maybe_send_server_embed(payload)
+        for _, player_data in ipairs(payload.players) do
+            maybe_send_player_embed(player_data)
+        end
     end)
 end, function(err)
     return debug.traceback(err, 2)
