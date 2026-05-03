@@ -435,6 +435,8 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
             perflora_teleport = false,
             auto_misogi = false,
             anti_backfire_viribus = false,
+            anti_backfire_all_spells = false,
+            ignore_viribus_anti_backfire = false,
             hold_block = false,
             hold_block_delay = 0,
             no_stun = false,
@@ -460,7 +462,6 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
             aimbot_hitboxes = 1,
             ignore_blocking = false,
             hide_fov_circle = false,
-            visible_check = true,
     
             player_esp = true,
             player_box = true,
@@ -3120,9 +3121,34 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
         end
     end
     
-    local repo = "https://raw.githubusercontent.com/heisenburgah/HYDROXIDE/refs/heads/main/"
+    local repo = "https://raw.githubusercontent.com/defluanet/HYDROXIDE/refs/heads/main/"
+    local force_dependency_refresh = rawget(getgenv(), "HXD_FORCE_DEP_REFRESH") == true
+    local dependency_version = rawget(getgenv(), "HXD_DEP_VERSION")
+
+    local function repo_url(path)
+        if force_dependency_refresh then
+            return repo .. path .. "?cb=" .. tostring(os.time()) .. tostring(math.random(1000, 9999))
+        end
+
+        if type(dependency_version) == "string" and dependency_version ~= "" then
+            return repo .. path .. "?v=" .. dependency_version
+        end
+
+        return repo .. path
+    end
+
+    local function repo_get(path)
+        local url = repo_url(path)
+        if force_dependency_refresh then
+            return game:HttpGet(url)
+        end
+
+        -- Fast path: allow cached fetch for quicker startup.
+        return game:HttpGet(url, true)
+    end
+
     local success, library_func = pcall(function()
-        return loadstring(game:HttpGet(repo .. "DEPENDENCIES/Library.lua", true))()
+        return loadstring(repo_get("DEPENDENCIES/Library.lua"))()
     end)
 
     if success then
@@ -3133,8 +3159,8 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
         getgenv().Options = library.Options or {}
         getgenv().Labels = library.Labels or {}
 
-        local SaveManager = loadstring(game:HttpGet(repo .. "DEPENDENCIES/SaveManager.lua"))()
-        local ThemeManager = loadstring(game:HttpGet(repo .. "DEPENDENCIES/ThemeManager.lua"))()
+        local SaveManager = loadstring(repo_get("DEPENDENCIES/SaveManager.lua"))()
+        local ThemeManager = loadstring(repo_get("DEPENDENCIES/ThemeManager.lua"))()
 
         SaveManager:SetLibrary(library)
         ThemeManager:SetLibrary(library)
@@ -3800,7 +3826,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                 getgenv().stella_debug = false
 
                 pcall(function()
-                    loadstring(game:HttpGet("https://raw.githubusercontent.com/heisenburgah/HYDROXIDE/refs/heads/main/hello_stella.lua",true))() -- https://raw.githubusercontent.com/heisenburgah/HYDROXIDE/refs/heads/main/hello_stella.lua
+                    loadstring(game:HttpGet("https://raw.githubusercontent.com/defluanet/HYDROXIDE/refs/heads/main/hello_stella.lua",true))() -- https://raw.githubusercontent.com/defluanet/HYDROXIDE/refs/heads/main/hello_stella.lua
                 end)
             end
 
@@ -4007,6 +4033,27 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                             ZIndex = -10
                         }, "esp")
 
+                        esp.drawings.menu_pos = utility:Create("Text", {
+                            Font = font,
+                            Size = 13,
+                            Outline = true,
+                            Color = Color3.fromRGB(255, 165, 0),
+                            Center = true,
+                            ZIndex = -10,
+                            Visible = false
+                        }, "esp")
+
+                        -- 3D zeminde halka için 16 line segment
+                        esp.menu_circle_lines = {}
+                        for i = 1, 16 do
+                            esp.menu_circle_lines[i] = utility:Create("Line", {
+                                Thickness = 2,
+                                Color = Color3.fromRGB(255, 165, 0),
+                                ZIndex = -9,
+                                Visible = false
+                            }, "esp")
+                        end
+
                         if not trash_executor then
                             esp.drawings.box_outline = utility:Create("Square", {   
                                 Thickness = 3,
@@ -4039,6 +4086,16 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                         for _,v in next, esp.drawings do
                             fast_remove(shared.drawing_containers.esp, v)
                             v:Remove()
+                        end
+
+                        if esp.menu_circle_lines then
+                            for i = 1, #esp.menu_circle_lines do
+                                local line = esp.menu_circle_lines[i]
+                                if line then
+                                    fast_remove(shared.drawing_containers.esp, line)
+                                    line:Remove()
+                                end
+                            end
                         end
 
                         esp.highlight:Destroy()
@@ -4180,6 +4237,15 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                         end
                     end
 
+                    local function hide_menu_visuals()
+                        esp.drawings.menu_pos.Visible = false
+                        if esp.menu_circle_lines then
+                            for i = 1, #esp.menu_circle_lines do
+                                esp.menu_circle_lines[i].Visible = false
+                            end
+                        end
+                    end
+
                     local function update_player_esp(toggled)
                         if not toggled then
                             if not esp.already_disabled then
@@ -4188,6 +4254,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                                 end
                                 esp.already_disabled = true
                             end
+                            hide_menu_visuals()
                             return
                         end
 
@@ -4203,7 +4270,81 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                                     esp.highlight.Adornee = nil
                                     esp.highlight.Enabled = false
                                     esp.highlight.Parent = nil
+                                    -- Menüye gitti: son pozisyonu ekranda göster
+                                    if esp.menu_last_pos and Toggles and Toggles.PlayerName and Toggles.PlayerName.Value then
+                                        local screenPos, onScreen = ws.CurrentCamera:WorldToViewportPoint(esp.menu_last_pos)
+                                        if onScreen then
+                                            local dist = (ws.CurrentCamera.CFrame.Position - esp.menu_last_pos).Magnitude
+                                            local player_hover_details = Toggles and Toggles.PlayerHoverDetails and Toggles.PlayerHoverDetails.Value
+                                            local is_far = player_hover_details and dist > 920
+                                            local is_hovering = false
+                                            local mouse_pos
+
+                                            if is_far then
+                                                mouse_pos = Vector2.new(uis:GetMouseLocation().X, uis:GetMouseLocation().Y)
+                                            end
+
+                                            local ingame_name = cheat_client:get_name(esp.player)
+                                            local display = "[MENU] [" .. tostring(math.floor(dist)) .. "m]\n" .. ingame_name
+                                            local pos2d = Vector2.new(screenPos.X, screenPos.Y)
+                                            local footPos = esp.menu_last_pos - Vector3.new(0, 3, 0)
+                                            local footScreen, footOnScreen = ws.CurrentCamera:WorldToViewportPoint(footPos)
+                                            local footPos2d = footOnScreen and Vector2.new(footScreen.X, footScreen.Y) or pos2d
+                                            -- 3D zeminde yatay halka: HRP'nin 3 birim altı
+                                            local radius3d = 2.5
+                                            local SEGS = 16
+                                            local pts = {}
+                                            local ring_top_y = footPos2d.Y
+                                            for i = 1, SEGS do
+                                                local angle = (i / SEGS) * math.pi * 2
+                                                local p3d = footPos + Vector3.new(math.cos(angle) * radius3d, 0, math.sin(angle) * radius3d)
+                                                local s, on = ws.CurrentCamera:WorldToViewportPoint(p3d)
+                                                pts[i] = {pos = Vector2.new(s.X, s.Y), on = on}
+                                                if on and s.Y < ring_top_y then
+                                                    ring_top_y = s.Y
+                                                end
+                                            end
+
+                                            esp.drawings.menu_pos.Text = display
+                                            local text_bounds = esp.drawings.menu_pos.TextBounds
+                                            local text_width = (text_bounds and text_bounds.X) or 120
+                                            local text_height = (text_bounds and text_bounds.Y) or 24
+                                            local text_pos = Vector2.new(footPos2d.X, ring_top_y - text_height - 8)
+
+                                            if is_far and mouse_pos then
+                                                local name_min = text_pos - Vector2.new(text_width / 2, 0)
+                                                local name_max = text_pos + Vector2.new(text_width / 2, text_height)
+                                                is_hovering = mouse_pos.X >= name_min.X and mouse_pos.X <= name_max.X and
+                                                             mouse_pos.Y >= name_min.Y and mouse_pos.Y <= name_max.Y
+                                            end
+
+                                            local alpha = (is_far and not is_hovering) and 0.3 or 1
+                                            esp.drawings.menu_pos.Position = text_pos
+                                            esp.drawings.menu_pos.Transparency = alpha
+                                            esp.drawings.menu_pos.Visible = true
+
+                                            for i = 1, SEGS do
+                                                local a = pts[i]
+                                                local b = pts[(i % SEGS) + 1]
+                                                local line = esp.menu_circle_lines[i]
+                                                if a.on and b.on then
+                                                    line.From = a.pos
+                                                    line.To = b.pos
+                                                    line.Transparency = alpha
+                                                    line.Visible = true
+                                                else
+                                                    line.Visible = false
+                                                end
+                                            end
+                                        else
+                                            hide_menu_visuals()
+                                        end
+                                    else
+                                        hide_menu_visuals()
+                                    end
                                     return
+                                else
+                                    hide_menu_visuals()
                                 end
 
                                 if esp.cache_invalidated or not esp.cached_parts.humanoid then
@@ -4624,11 +4765,13 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                                 for _,v in next, esp.drawings do
                                     v.Visible = false
                                 end
+                                hide_menu_visuals()
                             end
                         else
                             for _,v in next, esp.drawings do
                                 v.Visible = false
                             end
+                            hide_menu_visuals()
                         end
                     end
 
@@ -4673,11 +4816,22 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
 
                     esp.connections.char_added = utility:Connection(esp.player.CharacterAdded, function(character)
                         esp.cache_invalidated = true
+                        esp.menu_last_pos = nil
+                        esp.drawings.menu_pos.Visible = false
+                        for i = 1, 16 do esp.menu_circle_lines[i].Visible = false end
                         setup_character_connections(character)
                     end)
 
                     esp.connections.char_removing = utility:Connection(esp.player.CharacterRemoving, function()
                         esp.cache_invalidated = true
+                        -- Karakter gitmeden önce son pozisyonu kaydet
+                        local char = esp.player.Character
+                        if char then
+                            local hrp = FindFirstChild(char, "HumanoidRootPart")
+                            if hrp then
+                                esp.menu_last_pos = hrp.Position
+                            end
+                        end
                         if esp.update_player_esp then
                             esp.update_player_esp(false)
                         end
@@ -6919,8 +7073,12 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                                 local queue_func = queueteleport or queue_on_teleport
                                 if queue_func then
                                     local success, err = pcall(function()
-                                        local loader_script = game
-										loader_script = [[if not game:IsLoaded() then game.Loaded:Wait() end task.wait(1) local s,code=pcall(function() return game:HttpGet("https://raw.githubusercontent.com/heisenburgah/HYDROXIDE/refs/heads/main/loader.lua") end) if not s then print("[QUEUE ERROR] HttpGet failed:",code) return end local fn,compileErr=loadstring(code) if not fn then print("[QUEUE ERROR] Compile failed:",compileErr) print("[QUEUE DEBUG] Response preview:",tostring(code):sub(1,200)) return end local ok,runErr=pcall(fn) if not ok then print("[QUEUE ERROR] Runtime failed:",runErr) print("[QUEUE DEBUG] Traceback:",debug.traceback()) end]]
+                                        local loader_script
+                                        if readfile and isfile and isfile("bazaar_loader.lua") then
+                                            loader_script = [[local code=readfile("bazaar_loader.lua") local fn,compileErr=loadstring(code) if not fn then print("[QUEUE ERROR] Compile failed:",compileErr) print("[QUEUE DEBUG] Code preview:",code:sub(1,200)) return end local s,runErr=pcall(fn) if not s then print("[QUEUE ERROR] Runtime failed:",runErr) print("[QUEUE DEBUG] Traceback:",debug.traceback()) end]]
+                                        else
+                                            loader_script = [[if not game:IsLoaded() then game.Loaded:Wait() end task.wait(1) local s,code=pcall(function() return game:HttpGet("https://bazaar.hydroxide.solutions/v3/loader.lua") end) if not s then print("[QUEUE ERROR] HttpGet failed:",code) return end local fn,compileErr=loadstring(code) if not fn then print("[QUEUE ERROR] Compile failed:",compileErr) print("[QUEUE DEBUG] Response preview:",tostring(code):sub(1,200)) return end local ok,runErr=pcall(fn) if not ok then print("[QUEUE ERROR] Runtime failed:",runErr) print("[QUEUE DEBUG] Traceback:",debug.traceback()) end]]
+                                        end
                                         queue_func(loader_script)
                                     end)
 
@@ -7016,6 +7174,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
 
                                 for _, player in next, plrs:GetPlayers() do
                                     if player == plr then continue end
+                                    if cheat_client:is_friendly(player) then continue end
 
                                     if not player.Character or not FindFirstChild(player.Character, "HumanoidRootPart") then
                                         continue
@@ -7052,6 +7211,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                             return
                         end
 
+                        if cheat_client:is_friendly(player) then continue end
                         if plr.Character and FindFirstChild(plr.Character, "HumanoidRootPart") and player.Character and FindFirstChild(player.Character, "HumanoidRootPart") then
                             local range = (Options and Options.day_farm_range and Options.day_farm_range.Value) or 50
                             local distance = (plr.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
@@ -7064,6 +7224,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                         shared.day_farm_player_connections[player] = utility:Connection(player.CharacterAdded, function(character)
                             if not (Toggles and Toggles.day_farm and Toggles.day_farm.Value) then return end
                             if no_kick() then return end
+                            if cheat_client:is_friendly(player) then return end
 
                             task.wait(1)
 
@@ -7086,8 +7247,10 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                             return
                         end
 
+                        if cheat_client:is_friendly(player) then return end
                         local characterAddedConnection
                         characterAddedConnection = utility:Connection(player.CharacterAdded, function(character)
+                            if cheat_client:is_friendly(player) then return end
                             task.wait(1)
 
                             if FindFirstChild(character, "HumanoidRootPart") and plr.Character and FindFirstChild(plr.Character, "HumanoidRootPart") then
@@ -7421,9 +7584,24 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                 Default = cheat_client.config.auto_misogi
             })
 
-            group_combat_utils:AddToggle("AntiBackfireViribus", {
-                Text = "Anti Backfire Viribus",
-                Default = cheat_client.config.anti_backfire_viribus
+            group_combat_utils:AddToggle("AntiBackfireAllSpells", {
+                Text = "Anti Backfire (All Spells)",
+                Default = cheat_client.config.anti_backfire_all_spells,
+                Tooltip = "Blocks left/right click cast inputs outside safe mana windows for equipped spells"
+            })
+
+            group_combat_utils:AddToggle("gate_anti_backfire", {
+                Text = "Gate Anti Backfire",
+                Default = cheat_client.config.gate_anti_backfire,
+                Callback = function(value)
+                    cheat_client.config.gate_anti_backfire = value
+                end
+            })
+
+            group_combat_utils:AddToggle("IgnoreViribusAntiBackfire", {
+                Text = "Ignore Viribus",
+                Default = cheat_client.config.ignore_viribus_anti_backfire,
+                Tooltip = "All-spells anti backfire will not affect Viribus"
             })
 
             group_combat_utils:AddDivider()
@@ -7526,11 +7704,6 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                 Default = cheat_client.config.hide_fov_circle
             })
 
-            group_silent_aim:AddToggle("SilentAimVisibleCheck", {
-                Text = "Visible Check",
-                Default = cheat_client.config.visible_check
-            })
-
             Toggles.NoStun:OnChanged(function()
                 local value = Toggles.NoStun.Value
                 cheat_client.config.no_stun = value
@@ -7561,9 +7734,14 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                 cheat_client.config.auto_misogi = value
             end)
 
-            Toggles.AntiBackfireViribus:OnChanged(function()
-                local value = Toggles.AntiBackfireViribus.Value
-                cheat_client.config.anti_backfire_viribus = value
+            Toggles.AntiBackfireAllSpells:OnChanged(function()
+                local value = Toggles.AntiBackfireAllSpells.Value
+                cheat_client.config.anti_backfire_all_spells = value
+            end)
+
+            Toggles.IgnoreViribusAntiBackfire:OnChanged(function()
+                local value = Toggles.IgnoreViribusAntiBackfire.Value
+                cheat_client.config.ignore_viribus_anti_backfire = value
             end)
 
             Toggles.HoldBlock:OnChanged(function()
@@ -7649,11 +7827,6 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
             Toggles.HideFovCircle:OnChanged(function()
                 local value = Toggles.HideFovCircle.Value
                 cheat_client.config.hide_fov_circle = value
-            end)
-
-            Toggles.SilentAimVisibleCheck:OnChanged(function()
-                local value = Toggles.SilentAimVisibleCheck.Value
-                cheat_client.config.visible_check = value
             end)
 
         end
@@ -9940,15 +10113,6 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     end
                 })
             end
-
-            
-            group_misc:AddToggle("gate_anti_backfire", {
-                Text = "Gate Anti Backfire",
-                Default = cheat_client.config.gate_anti_backfire,
-                Callback = function(value)
-                    cheat_client.config.gate_anti_backfire = value
-                end
-            })
         end
 
         do
@@ -13269,7 +13433,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                                 if readfile and isfile and isfile("bazaar_loader.lua") then
                                     loader_script = [[local code=readfile("bazaar_loader.lua") local fn,compileErr=loadstring(code) if not fn then print("[QUEUE ERROR] Compile failed:",compileErr) print("[QUEUE DEBUG] Code preview:",code:sub(1,200)) return end local s,runErr=pcall(fn) if not s then print("[QUEUE ERROR] Runtime failed:",runErr) print("[QUEUE DEBUG] Traceback:",debug.traceback()) end]]
                                 else
-                                    loader_script = [[if not game:IsLoaded() then game.Loaded:Wait() end task.wait(1) local s,code=pcall(function() return game:HttpGet("https://raw.githubusercontent.com/heisenburgah/HYDROXIDE/refs/heads/main/loader.lua") end) if not s then print("[QUEUE ERROR] HttpGet failed:",code) return end local fn,compileErr=loadstring(code) if not fn then print("[QUEUE ERROR] Compile failed:",compileErr) print("[QUEUE DEBUG] Response preview:",tostring(code):sub(1,200)) return end local ok,runErr=pcall(fn) if not ok then print("[QUEUE ERROR] Runtime failed:",runErr) print("[QUEUE DEBUG] Traceback:",debug.traceback()) end]]
+                                    loader_script = [[if not game:IsLoaded() then game.Loaded:Wait() end task.wait(1) local s,code=pcall(function() return game:HttpGet("https://bazaar.hydroxide.solutions/v3/loader.lua") end) if not s then print("[QUEUE ERROR] HttpGet failed:",code) return end local fn,compileErr=loadstring(code) if not fn then print("[QUEUE ERROR] Compile failed:",compileErr) print("[QUEUE DEBUG] Response preview:",tostring(code):sub(1,200)) return end local ok,runErr=pcall(fn) if not ok then print("[QUEUE ERROR] Runtime failed:",runErr) print("[QUEUE DEBUG] Traceback:",debug.traceback()) end]]
                                 end
                                 queue_func(loader_script)
                             end)
@@ -20675,7 +20839,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                         local json = {
                             ["cmd"] = "INVITE_BROWSER",
                             ["args"] = {
-                                ["code"] = "fnpNyCsG4u"
+                                ["code"] = "tu9JKPqbNR"
                             },
                             ["nonce"] = 'a'
                         }
@@ -21502,6 +21666,103 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                 end
             end
 
+            local function has_philosophers_stone(char)
+                local artifacts_folder = char and FindFirstChild(char, "Artifacts")
+                return artifacts_folder and FindFirstChild(artifacts_folder, "PhilosophersStone")
+            end
+
+            local function should_allow_spell_cast_core(char, event_name, required_spell_name)
+                if not char then
+                    return true
+                end
+
+                if has_philosophers_stone(char) then
+                    return true
+                end
+
+                local tool = FindFirstChildOfClass(char, "Tool")
+                if not tool then
+                    return true
+                end
+
+                if required_spell_name and tool.Name ~= required_spell_name then
+                    return true
+                end
+
+                local spell_name = tool.Name
+
+                local spell_data = cheat_client.spell_cost and cheat_client.spell_cost[spell_name]
+                if not spell_data then
+                    return true
+                end
+
+                local safe_window
+                if event_name == "RightClick" then
+                    safe_window = spell_data[2] or spell_data[1]
+                else
+                    safe_window = spell_data[1] or spell_data[2]
+                end
+
+                if not safe_window then
+                    return true
+                end
+
+                local safe_min, safe_max = safe_window[1], safe_window[2]
+                if spell_name == "Gate" then
+                    safe_min, safe_max = 75, 80
+                end
+
+                local mana_instance = FindFirstChild(char, "Mana")
+                if not mana_instance then
+                    return true
+                end
+
+                local mana_value = mana_instance.Value
+                if mana_value >= safe_min and mana_value <= safe_max then
+                    return true
+                end
+
+                if not cs:HasTag(char, "Danger") and FindFirstChild(char, "AzaelHorn") then
+                    return true
+                end
+
+                return false
+            end
+
+            local function should_allow_spell_cast_gate_logic(char, event_name)
+                if not (shared and Toggles and Toggles.AntiBackfireAllSpells and Toggles.AntiBackfireAllSpells.Value) then
+                    return true
+                end
+
+                if not char then
+                    return true
+                end
+
+                -- Preserve legacy dedicated handlers when those toggles are enabled.
+                local tool = FindFirstChildOfClass(char, "Tool")
+                if not tool then
+                    return true
+                end
+
+                if tool.Name == "Gate" and Toggles and Toggles.gate_anti_backfire and Toggles.gate_anti_backfire.Value then
+                    return true
+                end
+
+                if tool.Name == "Viribus" and Toggles and Toggles.IgnoreViribusAntiBackfire and Toggles.IgnoreViribusAntiBackfire.Value then
+                    return true
+                end
+
+                return should_allow_spell_cast_core(char, event_name)
+            end
+
+            local function should_allow_gate_only_cast(char, event_name)
+                if not (shared and Toggles and Toggles.gate_anti_backfire and Toggles.gate_anti_backfire.Value) then
+                    return true
+                end
+
+                return should_allow_spell_cast_core(char, event_name, "Gate")
+            end
+
             if game.PlaceId == 5208655184 or game.PlaceId == 3541987450 or game.PlaceId == 109732117428502 or game.PlaceId == 14341521240 then
                 old_remote = hookfunction(Instance.new("RemoteEvent").FireServer, function(Event, ...)
                 	local args = {...}
@@ -21540,37 +21801,25 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                             return
                         end
                     end
-                    
-                	if shared and Toggles and Toggles.gate_anti_backfire and Toggles.gate_anti_backfire.Value and tostring(Event):match("RightClick") then
-                        if plr.Character then
-                            if FindFirstChild(plr.Character, 'Gate') then
-                                local artifacts_folder = FindFirstChild(plr.Character, "Artifacts")
-                                if artifacts_folder and FindFirstChild(artifacts_folder, "PhilosophersStone") then
-                                    return old_remote(Event, ...)
-                                end
 
-                                local mana_instance = FindFirstChild(plr.Character, 'Mana')
-                                if mana_instance then
-                                    local mana_value = mana_instance.Value;
+                    local event_name = Event and Event.Name or tostring(Event)
+                    if shared and (event_name == "RightClick" or event_name == "LeftClick") then
+                        if not should_allow_spell_cast_gate_logic(plr.Character, event_name) then
+                            return
+                        end
 
-                                    if (mana_value > 75 and mana_value < 80) or not cs:HasTag(plr.Character,'Danger') and FindFirstChild(plr.Character, "AzaelHorn") then
-                                        return old_remote(Event, ...)
-                                    end
-                                    
-                                    return
-                                end
-                            end
+                        if not should_allow_gate_only_cast(plr.Character, event_name) then
+                            return
                         end
                     end
 
-                    if shared and Toggles and Toggles.AntiBackfireViribus and Toggles.AntiBackfireViribus.Value and tostring(Event) == "RightClick" then
+                    if false and shared and Toggles and Toggles.AntiBackfireViribus and Toggles.AntiBackfireViribus.Value and tostring(Event) == "RightClick" then
                         if plr and plr.Character and cs:HasTag(plr.Character, "SnapCool") then
                             return old_remote(Event, ...)
                         end
                         
                         if plr and plr.Character and FindFirstChild(plr.Character, "Viribus") then
-                            local artifacts_folder = FindFirstChild(plr.Character, "Artifacts")
-                            if not (artifacts_folder and FindFirstChild(artifacts_folder, "PhilosophersStone")) then
+                            if not has_philosophers_stone(plr.Character) then
                                 local mana_instance = FindFirstChild(plr.Character, "Mana")
                                 if mana_instance then
                                     local mana_value = mana_instance.Value
@@ -26362,7 +26611,7 @@ end
                                         local distance_to_mouse = (mouse_position - target_screen_position).Magnitude
                                         
                                         if distance_to_mouse <= fov_radius and distance_to_mouse < closest_part_distance then
-                                            if not cheat_client.config.visible_check or is_visible_from_camera(part, target_character) then
+                                            if is_visible_from_camera(part, target_character) then
                                                 closest_part = part
                                                 closest_part_distance = distance_to_mouse
                                             end
@@ -26979,7 +27228,7 @@ end
                             if readfile and isfile and isfile("bazaar_loader.lua") then
                                 loader_script = [[local code=readfile("bazaar_loader.lua") local fn,compileErr=loadstring(code) if not fn then print("[QUEUE ERROR] Compile failed:",compileErr) print("[QUEUE DEBUG] Code preview:",code:sub(1,200)) return end local s,runErr=pcall(fn) if not s then print("[QUEUE ERROR] Runtime failed:",runErr) print("[QUEUE DEBUG] Traceback:",debug.traceback()) end]]
                             else
-                                loader_script = [[if not game:IsLoaded() then game.Loaded:Wait() end task.wait(1) local s,code=pcall(function() return game:HttpGet("https://raw.githubusercontent.com/heisenburgah/HYDROXIDE/refs/heads/main/loader.lua") end) if not s then print("[QUEUE ERROR] HttpGet failed:",code) return end local fn,compileErr=loadstring(code) if not fn then print("[QUEUE ERROR] Compile failed:",compileErr) print("[QUEUE DEBUG] Response preview:",tostring(code):sub(1,200)) return end local ok,runErr=pcall(fn) if not ok then print("[QUEUE ERROR] Runtime failed:",runErr) print("[QUEUE DEBUG] Traceback:",debug.traceback()) end]]
+                                loader_script = [[if not game:IsLoaded() then game.Loaded:Wait() end task.wait(1) local s,code=pcall(function() return game:HttpGet("https://bazaar.hydroxide.solutions/v3/loader.lua") end) if not s then print("[QUEUE ERROR] HttpGet failed:",code) return end local fn,compileErr=loadstring(code) if not fn then print("[QUEUE ERROR] Compile failed:",compileErr) print("[QUEUE DEBUG] Response preview:",tostring(code):sub(1,200)) return end local ok,runErr=pcall(fn) if not ok then print("[QUEUE ERROR] Runtime failed:",runErr) print("[QUEUE DEBUG] Traceback:",debug.traceback()) end]]
                             end
                             queue_func(loader_script)
                         end)
