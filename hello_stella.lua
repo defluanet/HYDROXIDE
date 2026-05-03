@@ -34,9 +34,6 @@ end
 local user_debug = getgenv().stella_debug or false
 local user_webhook = getgenv().stella_webhook or getgenv().stella_webhook_url
 local user_webhook_queue = getgenv().stella_webhook_queue
-local user_alert_targets = getgenv().stella_alert_targets
-local user_brand_name = getgenv().stella_brand_name
-local user_brand_icon = getgenv().stella_brand_icon
 
 if (not user_webhook or user_webhook == "") then
     warn("Stella | Set getgenv().stella_webhook before loading.")
@@ -55,17 +52,13 @@ getgenv().stella_debug = nil
 getgenv().stella_webhook = nil
 getgenv().stella_webhook_url = nil
 getgenv().stella_webhook_queue = nil
-getgenv().stella_alert_targets = nil
-getgenv().stella_brand_name = nil
-getgenv().stella_brand_icon = nil
 
 local success, err = xpcall(function()
     local config = {
         webhook_url = user_webhook,
         webhook_use_queue = user_webhook_queue ~= false,
-        alert_targets = type(user_alert_targets) == "table" and user_alert_targets or {},
-        brand_name = (type(user_brand_name) == "string" and user_brand_name ~= "") and user_brand_name or "Hydroxide Intelligence",
-        brand_icon = (type(user_brand_icon) == "string" and user_brand_icon ~= "") and user_brand_icon or nil,
+        brand_name = "Hydroxide Intelligence",
+        brand_icon = nil,
         snapshot_cooldown = 45,
 
         send_interval = 35,
@@ -940,26 +933,6 @@ local success, err = xpcall(function()
         }
     end
 
-    local function is_tracked_player(player_data)
-        local uid = tostring(player_data.roblox_id or "")
-        local uname = string.lower(tostring(player_data.roblox_username or ""))
-        local fname = string.lower(tostring(player_data.first_name or ""))
-
-        for _, target in ipairs(config.alert_targets) do
-            local text = tostring(target)
-            if text == uid then
-                return true
-            end
-
-            local lowered = string.lower(text)
-            if lowered == uname or lowered == fname then
-                return true
-            end
-        end
-
-        return false
-    end
-
     local function build_player_embed(player_data, is_alert)
         local profile_url = string.format("https://www.roblox.com/users/%s/profile", tostring(player_data.roblox_id or "0"))
         local has_gate, has_snarv = infer_player_flags(player_data)
@@ -1068,8 +1041,7 @@ local success, err = xpcall(function()
             sent_at = now,
         }
 
-        local is_alert = is_tracked_player(player_data)
-        send_webhook_embeds({ build_player_embed(player_data, is_alert) })
+        send_webhook_embeds({ build_player_embed(player_data, false) })
     end
 
     local function main()
