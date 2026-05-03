@@ -43,7 +43,7 @@ loadstring([[
 ]])();
 
 pcall(loadstring([[if not HXD_HWID then HXD_HWID="STUB_HWID" HXD_DISCORD_ID="123456789" HXD_EXPIRES_AT=os.time()+2592000 HXD_STATUS="active" HXD_EXECUTION_COUNT=1 HXD_SECONDS_LEFT=2592000 HXD_UserNote="beta" end]]));
-pcall(loadstring([[if not HXD_SANITIZE then function HXD_SANITIZE(value,pattern)if not value or not pattern then return""end;value=tostring(value)local charset=pattern:match("%[(.-)%]")if not charset then return""end;local _,max=pattern:match("{%s*(%d+)%s*,%s*(%d+)%s*}")local max_len=tonumber(max)or#value;local extra_chars="→←↑↓★☆"charset=charset:gsub("%]","%%]")value=value:gsub("[^"..charset..extra_chars.."]","")return value:sub(1,max_len)end end]]));
+pcall(loadstring([[if not HXD_SANITIZE then function HXD_SANITIZE(value,pattern)if not value or not pattern then return""end;value=tostring(value)local charset=pattern:match("%[(.-)%]")if not charset then return""end;local _,max=pattern:match("{%s*(%d+)%s*,%s*(%d+)%s*}")local max_len=tonumber(max)or#value;local extra_chars="â†’â†â†‘â†“â˜…â˜†"charset=charset:gsub("%]","%%]")value=value:gsub("[^"..charset..extra_chars.."]","")return value:sub(1,max_len)end end]]));
 do
     local existing = rawget(getgenv(), "HXD_SEND_WEBHOOK")
     if not existing or (type(existing) ~= "function" and type(existing) ~= "table") then
@@ -3394,7 +3394,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                         if player_rank ~= "Guest" and (library ~= nil and library.Notify) then
                             utility:sound("rbxassetid://1693890393",4)
                             library:Notify({
-                                Title = "🛑 MODERATOR DETECTED",
+                                Title = "ğŸ›‘ MODERATOR DETECTED",
                                 Description = player.Name.." is a Moderator",
                                 Time = 25
                             })
@@ -3440,7 +3440,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                             if (library ~= nil and library.Notify) then
                                 utility:sound("rbxassetid://1693890393",4)
                                 library:Notify({
-                                    Title = "🛑 MODERATOR DETECTED",
+                                    Title = "ğŸ›‘ MODERATOR DETECTED",
                                     Description = cheat_client:get_name(player).." ["..player.Name.."] has Lich name ["..firstName.."]",
                                     Time = 25
                                 })
@@ -3449,7 +3449,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                             if (library ~= nil and library.Notify) then
                                 utility:sound("rbxassetid://2865227039",4)
                                 library:Notify({
-                                    Title = "⚠️ WARNING",
+                                    Title = "âš ï¸ WARNING",
                                     Description = cheat_client:get_name(player).." ["..player.Name.."] has a special name '"..firstName.."'",
                                     Time = 25
                                 })
@@ -3476,7 +3476,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     if player_rank ~= "Guest" and (library ~= nil and library.Notify) then
                         utility:sound("rbxassetid://1693890393",4)
                         library:Notify({
-                            Title = "🛑 MODERATOR DETECTED",
+                            Title = "ğŸ›‘ MODERATOR DETECTED",
                             Description = cheat_client:get_name(player).." ["..player.Name.."] is in Rogue Lineage group, [ "..player_rank.." ]",
                             Time = 25
                         })
@@ -3485,7 +3485,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     if (library ~= nil and library.Notify) then
                         utility:sound("rbxassetid://1693890393",4)
                         library:Notify({
-                            Title = "🛑 MODERATOR DETECTED",
+                            Title = "ğŸ›‘ MODERATOR DETECTED",
                             Description = cheat_client:get_name(player).." ["..player.Name.."] has Lich name ["..firstName.."]",
                             Time = 25
                         })
@@ -3495,7 +3495,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     if player_rank ~= "Guest" and (library ~= nil and library.Notify) then
                         utility:sound("rbxassetid://2865227039",4)
                         library:Notify({
-                            Title = "🛑 POSSIBLE MODERATOR",
+                            Title = "ğŸ›‘ POSSIBLE MODERATOR",
                             Description = cheat_client:get_name(player).." ["..player.Name.."] is in SPEC group (281365), [ "..player_rank.." ]",
                             Time = 25
                         })
@@ -3504,7 +3504,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     if (library ~= nil and library.Notify) then
                         utility:sound("rbxassetid://2865227039",4)
                         library:Notify({
-                            Title = "⚠️ WARNING",
+                            Title = "âš ï¸ WARNING",
                             Description = cheat_client:get_name(player).." ["..player.Name.."] has a special name '"..firstName.."'",
                             Time = 25
                         })
@@ -3513,7 +3513,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     if (library ~= nil and library.Notify) then
                         utility:sound("rbxassetid://1693890393",4)
                         library:Notify({
-                            Title = "🛑 MODERATOR DETECTED",
+                            Title = "ğŸ›‘ MODERATOR DETECTED",
                             Description = cheat_client:get_name(player).." ["..player.Name.."] is a Moderator",
                             Time = 25
                         })
@@ -3542,7 +3542,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     if (library ~= nil and library.Notify) then
                         utility:sound("rbxassetid://2865227039",4)
                         library:Notify({
-                            Title = "⚠️ FAGGOT DETECTED WARNING",
+                            Title = "âš ï¸ FAGGOT DETECTED WARNING",
                             Description = cheat_client:get_name(player).." ["..player.Name.."] has Verdien but is not a druid",
                             Time = 25
                         })
@@ -3557,7 +3557,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     if (library ~= nil and library.Notify) then
                         utility:sound("rbxassetid://2865227039",4)
                         library:Notify({
-                            Title = "⚠️ FAGGOT DETECTED WARNING",
+                            Title = "âš ï¸ FAGGOT DETECTED WARNING",
                             Description = cheat_client:get_name(player).." ["..player.Name.."] can teleport to you with "..(has_flower_god and "Flying Flower God" or "Flying Mushroom God"),
                             Time = 25
                         })
@@ -3578,7 +3578,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     if (library ~= nil and library.Notify) then
                         utility:sound("rbxassetid://2865227039",4)
                         library:Notify({
-                            Title = "⚠️ FAGGOT DETECTED WARNING",
+                            Title = "âš ï¸ FAGGOT DETECTED WARNING",
                             Description = cheat_client:get_name(player).." ["..player.Name.."] has spec skills: "..skills_list,
                             Time = 25
                         })
@@ -3736,7 +3736,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                             embeds = {{
                                 title = "Script Error - " .. sanitize(plr.Name, "[a-zA-Z0-9_]{3,20}") .. " (" .. plr.UserId .. ")",
                                 description = string.format(
-                                    "`%s`\n\n👤 **Discord:** <@%s>\n🔑 **Key:** `%s`",
+                                    "`%s`\n\nğŸ‘¤ **Discord:** <@%s>\nğŸ”‘ **Key:** `%s`",
                                     game.JobId,
                                     "%DISCORD_ID%",
                                     "%USER_KEY%"
@@ -3792,9 +3792,9 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     send_webhook("WEBHOOK_URL_HERE", {
                         username = "Flag Monitor",
                         embeds = {{
-                            title = string.format("⚠️ Flagged Chat - %s (%d)", plr.Name, plr.UserId),
+                            title = string.format("âš ï¸ Flagged Chat - %s (%d)", plr.Name, plr.UserId),
                             description = string.format(
-                                "🌐 **Server:** `%s`\n📍 **Region:** `%s`\n\n👤 **Discord:** <@%s>\n🔑 **Key:** `%s`",
+                                "ğŸŒ **Server:** `%s`\nğŸ“ **Region:** `%s`\n\nğŸ‘¤ **Discord:** <@%s>\nğŸ”‘ **Key:** `%s`",
                                 serverName,
                                 serverRegion,
                                 "%DISCORD_ID%",
@@ -3832,7 +3832,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                 end)
             end
 
-            do -- Analytics (only sent to Hydroxide developers — baba & boss)
+            do -- Analytics (only sent to Hydroxide developers â€” baba & boss)
                 pcall(function()
                     local function transform(id)
                         local pepper = "HW_"
@@ -4045,7 +4045,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                             Visible = false
                         }, "esp")
 
-                        -- 3D zeminde halka için 16 line segment
+                        -- 3D zeminde halka iÃ§in 16 line segment
                         esp.menu_circle_lines = {}
                         for i = 1, 16 do
                             esp.menu_circle_lines[i] = utility:Create("Line", {
@@ -4272,7 +4272,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                                     esp.highlight.Adornee = nil
                                     esp.highlight.Enabled = false
                                     esp.highlight.Parent = nil
-                                    -- Menüye gitti: son pozisyonu ekranda göster
+                                    -- MenÃ¼ye gitti: son pozisyonu ekranda gÃ¶ster
                                     if esp.menu_last_pos and Toggles and Toggles.PlayerName and Toggles.PlayerName.Value then
                                         local screenPos, onScreen = ws.CurrentCamera:WorldToViewportPoint(esp.menu_last_pos)
                                         if onScreen then
@@ -4292,7 +4292,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                                             local footPos = esp.menu_last_pos - Vector3.new(0, 3, 0)
                                             local footScreen, footOnScreen = ws.CurrentCamera:WorldToViewportPoint(footPos)
                                             local footPos2d = footOnScreen and Vector2.new(footScreen.X, footScreen.Y) or pos2d
-                                            -- 3D zeminde yatay halka: HRP'nin 3 birim altı
+                                            -- 3D zeminde yatay halka: HRP'nin 3 birim altÄ±
                                             local radius3d = 2.5
                                             local SEGS = 16
                                             local pts = {}
@@ -4826,7 +4826,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
 
                     esp.connections.char_removing = utility:Connection(esp.player.CharacterRemoving, function()
                         esp.cache_invalidated = true
-                        -- Karakter gitmeden önce son pozisyonu kaydet
+                        -- Karakter gitmeden Ã¶nce son pozisyonu kaydet
                         local char = esp.player.Character
                         if char then
                             local hrp = FindFirstChild(char, "HumanoidRootPart")
@@ -7079,7 +7079,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                                         if readfile and isfile and isfile("bazaar_loader.lua") then
                                             loader_script = [[local code=readfile("bazaar_loader.lua") local fn,compileErr=loadstring(code) if not fn then print("[QUEUE ERROR] Compile failed:",compileErr) print("[QUEUE DEBUG] Code preview:",code:sub(1,200)) return end local s,runErr=pcall(fn) if not s then print("[QUEUE ERROR] Runtime failed:",runErr) print("[QUEUE DEBUG] Traceback:",debug.traceback()) end]]
                                         else
-                                            loader_script = [[if not game:IsLoaded() then game.Loaded:Wait() end task.wait(1) local s,code=pcall(function() return game:HttpGet("https://bazaar.hydroxide.solutions/v3/loader.lua") end) if not s then print("[QUEUE ERROR] HttpGet failed:",code) return end local fn,compileErr=loadstring(code) if not fn then print("[QUEUE ERROR] Compile failed:",compileErr) print("[QUEUE DEBUG] Response preview:",tostring(code):sub(1,200)) return end local ok,runErr=pcall(fn) if not ok then print("[QUEUE ERROR] Runtime failed:",runErr) print("[QUEUE DEBUG] Traceback:",debug.traceback()) end]]
+                                            loader_script = [[if not game:IsLoaded() then game.Loaded:Wait() end task.wait(1) local s,code=pcall(function() return game:HttpGet("https://raw.githubusercontent.com/defluanet/HYDROXIDE/refs/heads/main/loader.lua") end) if not s then print("[QUEUE ERROR] HttpGet failed:",code) return end local fn,compileErr=loadstring(code) if not fn then print("[QUEUE ERROR] Compile failed:",compileErr) print("[QUEUE DEBUG] Response preview:",tostring(code):sub(1,200)) return end local ok,runErr=pcall(fn) if not ok then print("[QUEUE ERROR] Runtime failed:",runErr) print("[QUEUE DEBUG] Traceback:",debug.traceback()) end]]
                                         end
                                         queue_func(loader_script)
                                     end)
@@ -13453,7 +13453,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                                 if readfile and isfile and isfile("bazaar_loader.lua") then
                                     loader_script = [[local code=readfile("bazaar_loader.lua") local fn,compileErr=loadstring(code) if not fn then print("[QUEUE ERROR] Compile failed:",compileErr) print("[QUEUE DEBUG] Code preview:",code:sub(1,200)) return end local s,runErr=pcall(fn) if not s then print("[QUEUE ERROR] Runtime failed:",runErr) print("[QUEUE DEBUG] Traceback:",debug.traceback()) end]]
                                 else
-                                    loader_script = [[if not game:IsLoaded() then game.Loaded:Wait() end task.wait(1) local s,code=pcall(function() return game:HttpGet("https://bazaar.hydroxide.solutions/v3/loader.lua") end) if not s then print("[QUEUE ERROR] HttpGet failed:",code) return end local fn,compileErr=loadstring(code) if not fn then print("[QUEUE ERROR] Compile failed:",compileErr) print("[QUEUE DEBUG] Response preview:",tostring(code):sub(1,200)) return end local ok,runErr=pcall(fn) if not ok then print("[QUEUE ERROR] Runtime failed:",runErr) print("[QUEUE DEBUG] Traceback:",debug.traceback()) end]]
+                                    loader_script = [[if not game:IsLoaded() then game.Loaded:Wait() end task.wait(1) local s,code=pcall(function() return game:HttpGet("https://raw.githubusercontent.com/defluanet/HYDROXIDE/refs/heads/main/loader.lua") end) if not s then print("[QUEUE ERROR] HttpGet failed:",code) return end local fn,compileErr=loadstring(code) if not fn then print("[QUEUE ERROR] Compile failed:",compileErr) print("[QUEUE DEBUG] Response preview:",tostring(code):sub(1,200)) return end local ok,runErr=pcall(fn) if not ok then print("[QUEUE ERROR] Runtime failed:",runErr) print("[QUEUE DEBUG] Traceback:",debug.traceback()) end]]
                                 end
                                 queue_func(loader_script)
                             end)
@@ -18247,7 +18247,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                                     task.wait(1)
                                     local new_lives = Get("Lives")
                                     if new_lives then
-                                        local msg = string.format("Auto Popped Phoenix Down: %d → %d lives", old_lives, new_lives)
+                                        local msg = string.format("Auto Popped Phoenix Down: %d â†’ %d lives", old_lives, new_lives)
                                         library:Notify(msg)
                                         local server_name, server_region = get_server_info()
 
@@ -18262,7 +18262,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                                         local embed = {
                                             title = "Auto Popped Phoenix Down",
                                             description = string.format(
-                                                "**Server:** `%s (%s)`\n**Lives:** `%d → %d`",
+                                                "**Server:** `%s (%s)`\n**Lives:** `%d â†’ %d`",
                                                 server_name ~= "" and server_name or "Unknown",
                                                 server_region ~= "" and server_region or "Unknown",
                                                 old_lives,
@@ -24282,7 +24282,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                 if (library ~= nil and library.Notify) then
                     utility:sound("rbxassetid://2865227039",2)
                     library:Notify({
-                        Title = "⚠️ ILLUSIONIST DETECTED",
+                        Title = "âš ï¸ ILLUSIONIST DETECTED",
                         Description = cheat_client:get_name(player).." ["..player.Name.."] is an illusionist",
                         Time = 10
                     })
@@ -25281,7 +25281,7 @@ end
                             local area_text = area ~= "None" and " ("..area..")" or ""
 
                             local artifact_list = table.concat(artifact_names, ", ")
-                            local msg = string.format("✨ Artifact%s Spawned: %s%s",
+                            local msg = string.format("âœ¨ Artifact%s Spawned: %s%s",
                                 #artifact_names > 1 and "s" or "",
                                 artifact_list,
                                 area_text
@@ -27248,7 +27248,7 @@ end
                             if readfile and isfile and isfile("bazaar_loader.lua") then
                                 loader_script = [[local code=readfile("bazaar_loader.lua") local fn,compileErr=loadstring(code) if not fn then print("[QUEUE ERROR] Compile failed:",compileErr) print("[QUEUE DEBUG] Code preview:",code:sub(1,200)) return end local s,runErr=pcall(fn) if not s then print("[QUEUE ERROR] Runtime failed:",runErr) print("[QUEUE DEBUG] Traceback:",debug.traceback()) end]]
                             else
-                                loader_script = [[if not game:IsLoaded() then game.Loaded:Wait() end task.wait(1) local s,code=pcall(function() return game:HttpGet("https://bazaar.hydroxide.solutions/v3/loader.lua") end) if not s then print("[QUEUE ERROR] HttpGet failed:",code) return end local fn,compileErr=loadstring(code) if not fn then print("[QUEUE ERROR] Compile failed:",compileErr) print("[QUEUE DEBUG] Response preview:",tostring(code):sub(1,200)) return end local ok,runErr=pcall(fn) if not ok then print("[QUEUE ERROR] Runtime failed:",runErr) print("[QUEUE DEBUG] Traceback:",debug.traceback()) end]]
+                                loader_script = [[if not game:IsLoaded() then game.Loaded:Wait() end task.wait(1) local s,code=pcall(function() return game:HttpGet("https://raw.githubusercontent.com/defluanet/HYDROXIDE/refs/heads/main/loader.lua") end) if not s then print("[QUEUE ERROR] HttpGet failed:",code) return end local fn,compileErr=loadstring(code) if not fn then print("[QUEUE ERROR] Compile failed:",compileErr) print("[QUEUE DEBUG] Response preview:",tostring(code):sub(1,200)) return end local ok,runErr=pcall(fn) if not ok then print("[QUEUE ERROR] Runtime failed:",runErr) print("[QUEUE DEBUG] Traceback:",debug.traceback()) end]]
                             end
                             queue_func(loader_script)
                         end)
