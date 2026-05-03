@@ -101,7 +101,8 @@ local success, err = xpcall(function()
     local server_embed_signature = nil
 
     if type(config.webhook_url) == "string" and config.webhook_url ~= "" and config.webhook_use_queue then
-        if config.webhook_url:find("/api/webhooks/") and not config.webhook_url:find("/queue") then
+        local is_heroinhound = config.webhook_url:find("heroinhound", 1, true)
+        if is_heroinhound and config.webhook_url:find("/api/webhooks/") and not config.webhook_url:find("/queue") then
             config.webhook_url = config.webhook_url .. "/queue"
         end
     end
