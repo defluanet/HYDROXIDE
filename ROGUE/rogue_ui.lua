@@ -556,6 +556,8 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
             auto_resurrection = false,
             auto_charge = false,
             auto_charge_threshold = 100,
+            auto_cast_verdien = false,
+            auto_cast_verdien_unequip_on_stop = true,
             auto_bag = false,
             show_bag_range = false,
             bag_range = 80,
@@ -9023,6 +9025,24 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                 Rounding = 1,
                 Callback = function(value)
                     cheat_client.config.auto_charge_threshold = value
+                end
+            })
+
+            group_farm:AddToggle("AutoCastVerdien", {
+                Text = "Auto Cast Verdien",
+                Default = cheat_client.config.auto_cast_verdien,
+                Tooltip = "Auto uses normal Verdien every 10s (fixed) in safe mana range",
+                Callback = function(value)
+                    cheat_client.config.auto_cast_verdien = value
+                end
+            })
+
+            group_farm:AddToggle("AutoCastVerdienUnequipOnStop", {
+                Text = "Unequip Verdien On Stop",
+                Default = cheat_client.config.auto_cast_verdien_unequip_on_stop,
+                Tooltip = "When Auto Cast Verdien is disabled, unequip Verdien/New Verdien",
+                Callback = function(value)
+                    cheat_client.config.auto_cast_verdien_unequip_on_stop = value
                 end
             })
 
@@ -27258,6 +27278,79 @@ end
             local function apply_auto_charge(character)
                 local mana = WaitForChild(character, "Mana")
                 local cached_tool = nil
+                local VERDIEN_AUTOCAST_INTERVAL = 10
+                local last_verdien_cast = 0
+
+                local function find_verdien_tool(char)
+                    local equipped = FindFirstChild(char, "Verdien") or FindFirstChild(char, "New Verdien")
+                    if equipped and equipped:IsA("Tool") then
+                        return equipped
+                    end
+
+                    local backpack = plr and plr.Backpack
+                    if not backpack then
+                        return nil
+                    end
+
+                    local in_bag = FindFirstChild(backpack, "Verdien") or FindFirstChild(backpack, "New Verdien")
+                    if in_bag and in_bag:IsA("Tool") then
+                        return in_bag
+                    end
+
+                    return nil
+                end
+
+                local function is_verdien_tool(tool)
+                    return tool
+                        and tool:IsA("Tool")
+                        and (tool.Name == "Verdien" or tool.Name == "New Verdien")
+                end
+
+                local function should_run_verdien(char)
+                    if not shared or shared.is_unloading or not utility or not Toggles then
+                        return false
+                    end
+
+                    if not plr.Character or plr.Character ~= char then
+                        return false
+                    end
+
+                    if not (Toggles.AutoCastVerdien and Toggles.AutoCastVerdien.Value) then
+                        return false
+                    end
+
+                    if (Toggles.SnapTrain and Toggles.SnapTrain.Value) or (Toggles.train_climb and Toggles.train_climb.Value) then
+                        return false
+                    end
+
+                    if cs:HasTag(char, "Casting") or cs:HasTag(char, "Danger") then
+                        return false
+                    end
+
+                    return true
+                end
+
+                local function charge_verdien_mana_until(min_cost, char)
+                    if not mana_remote or not utility then
+                        return false
+                    end
+
+                    while shared and not shared.is_unloading and mana.Value < min_cost do
+                        if not should_run_verdien(char) then
+                            utility:decharge_mana()
+                            return false
+                        end
+
+                        utility:charge_mana()
+                        adjusted_wait(0.06, 0.7)
+                    end
+
+                    if utility and FindFirstChild(char, "Charge") then
+                        utility:decharge_mana()
+                    end
+
+                    return should_run_verdien(char)
+                end
 
                 task.spawn(function()
                     while shared and not shared.is_unloading do
@@ -27366,6 +27459,90 @@ end
                                 adjusted_wait(0.05)
                             until mana.Value == 0 or not Toggles.train_climb.Value
                         end
+
+                    end
+                end)
+
+                task.spawn(function()
+                    local verdien_was_enabled = false
+
+                    while shared and not shared.is_unloading do
+                        task.wait(0.1)
+
+                        if not plr.Character or plr.Character ~= character or not utility or not Toggles then
+                            break
+                        end
+
+                        local enabled = Toggles.AutoCastVerdien and Toggles.AutoCastVerdien.Value
+                        if verdien_was_enabled and not enabled and utility then
+                            utility:decharge_mana()
+
+                            local should_unequip = (Toggles.AutoCastVerdienUnequipOnStop and Toggles.AutoCastVerdienUnequipOnStop.Value)
+                                or cheat_client.config.auto_cast_verdien_unequip_on_stop
+                            if should_unequip and plr.Character and plr.Character == character then
+                                local equipped_tool = FindFirstChildOfClass(plr.Character, "Tool")
+                                if is_verdien_tool(equipped_tool) and plr.Character:FindFirstChild("Humanoid") then
+                                    plr.Character.Humanoid:UnequipTools()
+                                end
+                            end
+                        end
+                        verdien_was_enabled = enabled
+
+                        if not enabled then
+                            continue
+                        end
+
+                        local char = plr.Character
+                        if not should_run_verdien(char) then
+                            continue
+                        end
+
+                        local now = tick()
+                        if now - last_verdien_cast < VERDIEN_AUTOCAST_INTERVAL then
+                            continue
+                        end
+
+                        local verdien_tool = find_verdien_tool(char)
+                        if not verdien_tool then
+                            continue
+                        end
+
+                        local mana_val = mana.Value
+                        local spell_data = cheat_client.spell_cost and cheat_client.spell_cost["Verdien"]
+                        local safe = spell_data and spell_data[1]
+                        local min_cost = safe and safe[1] or 75
+                        local max_cost = safe and safe[2] or 100
+
+                        if mana_val < min_cost then
+                            if not charge_verdien_mana_until(min_cost, char) then
+                                continue
+                            end
+                            mana_val = mana.Value
+                        end
+
+                        if not should_run_verdien(char) then
+                            continue
+                        end
+
+                        if mana_val < min_cost or mana_val > max_cost then
+                            continue
+                        end
+
+                        if verdien_tool.Parent == plr.Backpack then
+                            char.Humanoid:EquipTool(verdien_tool)
+                            adjusted_wait(0.05)
+
+                            if not should_run_verdien(char) then
+                                continue
+                            end
+                        end
+
+                        if not should_run_verdien(char) then
+                            continue
+                        end
+
+                        utility:LeftClick()
+                        last_verdien_cast = tick()
                     end
                 end)
             end
