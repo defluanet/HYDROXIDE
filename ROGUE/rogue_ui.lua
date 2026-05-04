@@ -43,7 +43,7 @@ loadstring([[
 ]])();
 
 pcall(loadstring([[if not HXD_HWID then HXD_HWID="STUB_HWID" HXD_DISCORD_ID="123456789" HXD_EXPIRES_AT=os.time()+2592000 HXD_STATUS="active" HXD_EXECUTION_COUNT=1 HXD_SECONDS_LEFT=2592000 HXD_UserNote="beta" end]]));
-pcall(loadstring([[if not HXD_SANITIZE then function HXD_SANITIZE(value,pattern)if not value or not pattern then return""end;value=tostring(value)local charset=pattern:match("%[(.-)%]")if not charset then return""end;local _,max=pattern:match("{%s*(%d+)%s*,%s*(%d+)%s*}")local max_len=tonumber(max)or#value;local extra_chars="â†’â†â†‘â†“â˜…â˜†"charset=charset:gsub("%]","%%]")value=value:gsub("[^"..charset..extra_chars.."]","")return value:sub(1,max_len)end end]]));
+pcall(loadstring([[if not HXD_SANITIZE then function HXD_SANITIZE(value,pattern)if not value or not pattern then return""end;value=tostring(value)local charset=pattern:match("%[(.-)%]")if not charset then return""end;local _,max=pattern:match("{%s*(%d+)%s*,%s*(%d+)%s*}")local max_len=tonumber(max)or#value;local extra_chars="→←↑↓★☆"charset=charset:gsub("%]","%%]")value=value:gsub("[^"..charset..extra_chars.."]","")return value:sub(1,max_len)end end]]));
 do
     local existing = rawget(getgenv(), "HXD_SEND_WEBHOOK")
     if not existing or (type(existing) ~= "function" and type(existing) ~= "table") then
@@ -285,6 +285,141 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
         warn(string.format("[TELEPORT FAILED] %s - Retrying serverhop...", teleport_fail_reason))
     end)
 
+    local function clear_roblox_error_prompt()
+        if not gui or typeof(gui.ClearError) ~= "function" then
+            return
+        end
+
+        pcall(function()
+            gui:ClearError()
+        end)
+    end
+
+    local forcefield_error_prompt_target = nil
+    local forcefield_error_prompt_original_enabled = nil
+    local forcefield_error_prompt_original_visible = nil
+
+    -- Tracks which keys/mouse buttons are held so we can re-inject them after
+    -- the error prompt briefly steals/drops input.
+    local ff_held_keys   = {}   -- [KeyCode] = true
+    local ff_held_mouse  = {}   -- [button_index 0/1/2] = true
+    local ff_input_began_con  = nil
+    local ff_input_ended_con  = nil
+
+    local function ff_reinject_held_inputs()
+        if not vim then return end
+        for kc, _ in pairs(ff_held_keys) do
+            pcall(function() vim:SendKeyEvent(true, kc, false, game) end)
+        end
+        for btn, _ in pairs(ff_held_mouse) do
+            pcall(function()
+                local mx, my = 0, 0
+                pcall(function()
+                    local mp = uis:GetMouseLocation()
+                    mx, my = mp.X, mp.Y
+                end)
+                vim:SendMouseButtonEvent(mx, my, btn, true, game, 0)
+            end)
+        end
+    end
+
+    local function ff_start_input_tracking()
+        if ff_input_began_con then return end
+        ff_held_keys  = {}
+        ff_held_mouse = {}
+        ff_input_began_con = uis.InputBegan:Connect(function(input, gpe)
+            if gpe then return end
+            if input.UserInputType == Enum.UserInputType.Keyboard then
+                ff_held_keys[input.KeyCode] = true
+            elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+                ff_held_mouse[0] = true
+            elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+                ff_held_mouse[1] = true
+            elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
+                ff_held_mouse[2] = true
+            end
+        end)
+        ff_input_ended_con = uis.InputEnded:Connect(function(input, gpe)
+            if input.UserInputType == Enum.UserInputType.Keyboard then
+                ff_held_keys[input.KeyCode] = nil
+            elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+                ff_held_mouse[0] = nil
+            elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+                ff_held_mouse[1] = nil
+            elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
+                ff_held_mouse[2] = nil
+            end
+        end)
+    end
+
+    local function ff_stop_input_tracking()
+        if ff_input_began_con then
+            ff_input_began_con:Disconnect()
+            ff_input_began_con = nil
+        end
+        if ff_input_ended_con then
+            ff_input_ended_con:Disconnect()
+            ff_input_ended_con = nil
+        end
+        ff_held_keys  = {}
+        ff_held_mouse = {}
+    end
+
+    local function suppress_forcefield_error_prompt()
+        if not cg then
+            return
+        end
+
+        local prompt_gui = FindFirstChild(cg, "RobloxPromptGui")
+        local prompt_overlay = prompt_gui and FindFirstChild(prompt_gui, "promptOverlay")
+        local error_prompt = prompt_overlay and FindFirstChild(prompt_overlay, "ErrorPrompt")
+
+        if not error_prompt then
+            clear_roblox_error_prompt()
+            return
+        end
+
+        if forcefield_error_prompt_target ~= error_prompt then
+            forcefield_error_prompt_target = error_prompt
+            forcefield_error_prompt_original_enabled = nil
+            forcefield_error_prompt_original_visible = nil
+            pcall(function()
+                forcefield_error_prompt_original_enabled = error_prompt.Enabled
+            end)
+            pcall(function()
+                forcefield_error_prompt_original_visible = error_prompt.Visible
+            end)
+        end
+
+        pcall(function()
+            error_prompt.Enabled = false
+        end)
+        pcall(function()
+            error_prompt.Visible = false
+        end)
+        clear_roblox_error_prompt()
+        ff_reinject_held_inputs()
+    end
+
+    local function restore_forcefield_error_prompt()
+        if forcefield_error_prompt_target then
+            if forcefield_error_prompt_original_enabled ~= nil then
+                pcall(function()
+                    forcefield_error_prompt_target.Enabled = forcefield_error_prompt_original_enabled
+                end)
+            end
+            if forcefield_error_prompt_original_visible ~= nil then
+                pcall(function()
+                    forcefield_error_prompt_target.Visible = forcefield_error_prompt_original_visible
+                end)
+            end
+        end
+
+        forcefield_error_prompt_target = nil
+        forcefield_error_prompt_original_enabled = nil
+        forcefield_error_prompt_original_visible = nil
+    end
+
     local is_gaia = game.PlaceId == 5208655184;
     local is_khei = game.PlaceId == 3541987450 or game.PlaceId == 14341521240;
 
@@ -293,6 +428,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
     local ingredient_folder = nil
     local auto_pot_active = false
     local auto_craft_active = false
+    local auto_smelt_active = false
     local was_noclip_enabled = false
 
     local mana_overlay = {}
@@ -489,6 +625,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
             legit_intent = false,
     
             trinket_esp = true,
+            trinket_esp_keybind = "None",
             trinket_show_area = true,
             trinket_range = 1000,
             trinket_types = {
@@ -558,6 +695,8 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
             auto_charge_threshold = 100,
             auto_cast_verdien = false,
             auto_cast_verdien_unequip_on_stop = true,
+            auto_smelt = false,
+            auto_smelt_save_mythril = false,
             auto_bag = false,
             show_bag_range = false,
             bag_range = 80,
@@ -606,6 +745,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
             auto_ingredient_pickup_keybind = "None",
             auto_weapon_keybind = "None",
             auto_craft_delay = 0.25,
+            auto_smelt_delay = 0.2,
             ps_heal_button_keybind = "None",
             instant_menu_keybind = "None",
             menu_keybind = "RightShift",
@@ -2139,6 +2279,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                 end)
                 auto_craft_active = nil
                 auto_pot_active = nil
+                auto_smelt_active = nil
                 dialogue_remote = nil
                 mana_remote = nil
                 done = nil
@@ -3394,7 +3535,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                         if player_rank ~= "Guest" and (library ~= nil and library.Notify) then
                             utility:sound("rbxassetid://1693890393",4)
                             library:Notify({
-                                Title = "ğŸ›‘ MODERATOR DETECTED",
+                                Title = "🛑 MODERATOR DETECTED",
                                 Description = player.Name.." is a Moderator",
                                 Time = 25
                             })
@@ -3440,7 +3581,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                             if (library ~= nil and library.Notify) then
                                 utility:sound("rbxassetid://1693890393",4)
                                 library:Notify({
-                                    Title = "ğŸ›‘ MODERATOR DETECTED",
+                                    Title = "🛑 MODERATOR DETECTED",
                                     Description = cheat_client:get_name(player).." ["..player.Name.."] has Lich name ["..firstName.."]",
                                     Time = 25
                                 })
@@ -3449,7 +3590,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                             if (library ~= nil and library.Notify) then
                                 utility:sound("rbxassetid://2865227039",4)
                                 library:Notify({
-                                    Title = "âš ï¸ WARNING",
+                                    Title = "⚠️ WARNING",
                                     Description = cheat_client:get_name(player).." ["..player.Name.."] has a special name '"..firstName.."'",
                                     Time = 25
                                 })
@@ -3476,7 +3617,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     if player_rank ~= "Guest" and (library ~= nil and library.Notify) then
                         utility:sound("rbxassetid://1693890393",4)
                         library:Notify({
-                            Title = "ğŸ›‘ MODERATOR DETECTED",
+                            Title = "🛑 MODERATOR DETECTED",
                             Description = cheat_client:get_name(player).." ["..player.Name.."] is in Rogue Lineage group, [ "..player_rank.." ]",
                             Time = 25
                         })
@@ -3485,7 +3626,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     if (library ~= nil and library.Notify) then
                         utility:sound("rbxassetid://1693890393",4)
                         library:Notify({
-                            Title = "ğŸ›‘ MODERATOR DETECTED",
+                            Title = "🛑 MODERATOR DETECTED",
                             Description = cheat_client:get_name(player).." ["..player.Name.."] has Lich name ["..firstName.."]",
                             Time = 25
                         })
@@ -3495,7 +3636,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     if player_rank ~= "Guest" and (library ~= nil and library.Notify) then
                         utility:sound("rbxassetid://2865227039",4)
                         library:Notify({
-                            Title = "ğŸ›‘ POSSIBLE MODERATOR",
+                            Title = "🛑 POSSIBLE MODERATOR",
                             Description = cheat_client:get_name(player).." ["..player.Name.."] is in SPEC group (281365), [ "..player_rank.." ]",
                             Time = 25
                         })
@@ -3504,7 +3645,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     if (library ~= nil and library.Notify) then
                         utility:sound("rbxassetid://2865227039",4)
                         library:Notify({
-                            Title = "âš ï¸ WARNING",
+                            Title = "⚠️ WARNING",
                             Description = cheat_client:get_name(player).." ["..player.Name.."] has a special name '"..firstName.."'",
                             Time = 25
                         })
@@ -3513,7 +3654,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     if (library ~= nil and library.Notify) then
                         utility:sound("rbxassetid://1693890393",4)
                         library:Notify({
-                            Title = "ğŸ›‘ MODERATOR DETECTED",
+                            Title = "🛑 MODERATOR DETECTED",
                             Description = cheat_client:get_name(player).." ["..player.Name.."] is a Moderator",
                             Time = 25
                         })
@@ -3542,7 +3683,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     if (library ~= nil and library.Notify) then
                         utility:sound("rbxassetid://2865227039",4)
                         library:Notify({
-                            Title = "âš ï¸ FAGGOT DETECTED WARNING",
+                            Title = "⚠️ FAGGOT DETECTED WARNING",
                             Description = cheat_client:get_name(player).." ["..player.Name.."] has Verdien but is not a druid",
                             Time = 25
                         })
@@ -3557,7 +3698,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     if (library ~= nil and library.Notify) then
                         utility:sound("rbxassetid://2865227039",4)
                         library:Notify({
-                            Title = "âš ï¸ FAGGOT DETECTED WARNING",
+                            Title = "⚠️ FAGGOT DETECTED WARNING",
                             Description = cheat_client:get_name(player).." ["..player.Name.."] can teleport to you with "..(has_flower_god and "Flying Flower God" or "Flying Mushroom God"),
                             Time = 25
                         })
@@ -3578,7 +3719,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     if (library ~= nil and library.Notify) then
                         utility:sound("rbxassetid://2865227039",4)
                         library:Notify({
-                            Title = "âš ï¸ FAGGOT DETECTED WARNING",
+                            Title = "⚠️ FAGGOT DETECTED WARNING",
                             Description = cheat_client:get_name(player).." ["..player.Name.."] has spec skills: "..skills_list,
                             Time = 25
                         })
@@ -3736,7 +3877,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                             embeds = {{
                                 title = "Script Error - " .. sanitize(plr.Name, "[a-zA-Z0-9_]{3,20}") .. " (" .. plr.UserId .. ")",
                                 description = string.format(
-                                    "`%s`\n\nğŸ‘¤ **Discord:** <@%s>\nğŸ”‘ **Key:** `%s`",
+                                    "`%s`\n\n👤 **Discord:** <@%s>\n🔑 **Key:** `%s`",
                                     game.JobId,
                                     "%DISCORD_ID%",
                                     "%USER_KEY%"
@@ -3792,9 +3933,9 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     send_webhook("WEBHOOK_URL_HERE", {
                         username = "Flag Monitor",
                         embeds = {{
-                            title = string.format("âš ï¸ Flagged Chat - %s (%d)", plr.Name, plr.UserId),
+                            title = string.format("⚠️ Flagged Chat - %s (%d)", plr.Name, plr.UserId),
                             description = string.format(
-                                "ğŸŒ **Server:** `%s`\nğŸ“ **Region:** `%s`\n\nğŸ‘¤ **Discord:** <@%s>\nğŸ”‘ **Key:** `%s`",
+                                "🌐 **Server:** `%s`\n📍 **Region:** `%s`\n\n👤 **Discord:** <@%s>\n🔑 **Key:** `%s`",
                                 serverName,
                                 serverRegion,
                                 "%DISCORD_ID%",
@@ -3832,7 +3973,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                 end)
             end
 
-            do -- Analytics (only sent to Hydroxide developers â€” baba & boss)
+            do -- Analytics (only sent to Hydroxide developers — baba & boss)
                 pcall(function()
                     local function transform(id)
                         local pepper = "HW_"
@@ -4045,7 +4186,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                             Visible = false
                         }, "esp")
 
-                        -- 3D zeminde halka iÃ§in 16 line segment
+                        -- 3D zeminde halka için 16 line segment
                         esp.menu_circle_lines = {}
                         for i = 1, 16 do
                             esp.menu_circle_lines[i] = utility:Create("Line", {
@@ -4272,7 +4413,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                                     esp.highlight.Adornee = nil
                                     esp.highlight.Enabled = false
                                     esp.highlight.Parent = nil
-                                    -- MenÃ¼ye gitti: son pozisyonu ekranda gÃ¶ster
+                                    -- Menüye gitti: son pozisyonu ekranda göster
                                     if esp.menu_last_pos and Toggles and Toggles.PlayerName and Toggles.PlayerName.Value then
                                         local screenPos, onScreen = ws.CurrentCamera:WorldToViewportPoint(esp.menu_last_pos)
                                         if onScreen then
@@ -4292,7 +4433,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                                             local footPos = esp.menu_last_pos - Vector3.new(0, 3, 0)
                                             local footScreen, footOnScreen = ws.CurrentCamera:WorldToViewportPoint(footPos)
                                             local footPos2d = footOnScreen and Vector2.new(footScreen.X, footScreen.Y) or pos2d
-                                            -- 3D zeminde yatay halka: HRP'nin 3 birim altÄ±
+                                            -- 3D zeminde yatay halka: HRP'nin 3 birim altı
                                             local radius3d = 2.5
                                             local SEGS = 16
                                             local pts = {}
@@ -4826,7 +4967,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
 
                     esp.connections.char_removing = utility:Connection(esp.player.CharacterRemoving, function()
                         esp.cache_invalidated = true
-                        -- Karakter gitmeden Ã¶nce son pozisyonu kaydet
+                        -- Karakter gitmeden önce son pozisyonu kaydet
                         local char = esp.player.Character
                         if char then
                             local hrp = FindFirstChild(char, "HumanoidRootPart")
@@ -6705,11 +6846,35 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     ['Mythril Bar'] = 1
                 }
             }
+
+            local smeltable_ores = {
+                ["Copper"] = true,
+                ["Tin"] = true,
+                ["Iron"] = true,
+                ["Mythril"] = true,
+            }
+
+            local AUTO_SMELT_FURNACE_RANGE = 15
+
+            local function has_smeltable_ore_in_backpack()
+                if not plr.Backpack then return false end
+
+                for _, item in next, plr.Backpack:GetChildren() do
+                    if item:IsA("Tool") and smeltable_ores[item.Name] and FindFirstChild(item, "Handle") then
+                        return true
+                    end
+                end
+
+                return false
+            end
     
-            local stations = FindFirstChild(workspace, "Stations");
+            local function get_stations()
+                return FindFirstChild(workspace, "Stations")
+            end
     
             local function GrabStation(type)
                 if plr.Character and FindFirstChild(plr.Character, "HumanoidRootPart") then
+                    local stations = get_stations()
                     if typeof(type) ~= "string" then
                         return warn(string.format("Expected type string got <%s>",typeof(type)))
                     elseif(not stations) then
@@ -6753,6 +6918,215 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
             autoCraftUtils.hasMaterials = function(craftType, item)
                 return hasMaterials(craftType == 'Alchemy' and potions or swords, item);
             end;
+
+            local function get_nearest_furnace(max_distance)
+                local character = plr.Character
+                local root = character and FindFirstChild(character, "HumanoidRootPart")
+                local stations = get_stations()
+                if not root then return nil, nil end
+
+                local closest_station, closest_part
+                local closest_distance = max_distance or 15
+
+                if stations then
+                    for _, station in next, stations:GetChildren() do
+                        local station_name = string.lower(station.Name)
+                        if string.find(station_name, "furnace") then
+                            local part = nil
+
+                            for _, descendant in next, station:GetDescendants() do
+                                if descendant:IsA("BasePart") and descendant.Name == "Furnace" then
+                                    part = descendant
+                                    break
+                                end
+                            end
+
+                            part = part or FindFirstChild(station, "Material") or FindFirstChild(station, "Timer")
+                            if part and part:IsA("BasePart") then
+                                local distance = (part.Position - root.Position).Magnitude
+                                if distance <= closest_distance then
+                                    closest_distance = distance
+                                    closest_station = station
+                                    closest_part = part
+                                end
+                            end
+                        end
+                    end
+                end
+
+                if closest_part then
+                    return closest_station, closest_part
+                end
+
+                local descendant_max_distance = max_distance or AUTO_SMELT_FURNACE_RANGE
+                local furnace_part = nil
+                local furnace_distance = math.huge
+                for _, object in next, workspace:GetDescendants() do
+                    if object:IsA("BasePart") and object.Name == "Furnace" then
+                        local distance = (object.Position - root.Position).Magnitude
+                        if distance < furnace_distance and distance <= descendant_max_distance then
+                            furnace_distance = distance
+                            furnace_part = object
+                        end
+                    end
+                end
+
+                if furnace_part then
+                    return furnace_part.Parent, furnace_part
+                end
+
+                return closest_station, closest_part
+            end
+
+            local function can_start_auto_smelt()
+                if not plr.Character or not FindFirstChild(plr.Character, "HumanoidRootPart") then
+                    return false, "Auto Smelt: Character not ready."
+                end
+
+                local _, furnace_part = get_nearest_furnace(AUTO_SMELT_FURNACE_RANGE)
+                if not furnace_part then
+                    return false, "Auto Smelt: You must be near a furnace."
+                end
+
+                if not has_smeltable_ore_in_backpack() then
+                    return false, "Some ingredients are missing!"
+                end
+
+                if cheat_client.config.auto_smelt_save_mythril then
+                    local mythril_count = 0
+                    local non_mythril_count = 0
+                    if plr.Backpack then
+                        for _, item in next, plr.Backpack:GetChildren() do
+                            if item:IsA("Tool") and FindFirstChild(item, "Handle") and smeltable_ores[item.Name] then
+                                if item.Name == "Mythril" then
+                                    mythril_count = mythril_count + 1
+                                else
+                                    non_mythril_count = non_mythril_count + 1
+                                end
+                            end
+                        end
+                    end
+                    if non_mythril_count == 0 and mythril_count <= 1 then
+                        return false, "Some ingredients are missing!\n(Saving 1 Mythril)"
+                    end
+                end
+
+                return true
+            end
+
+            function utility:can_start_auto_smelt()
+                return can_start_auto_smelt()
+            end
+
+            local function resolve_furnace_touch_part(furnace_part)
+                if not furnace_part or not furnace_part.Parent then
+                    return furnace_part
+                end
+
+                local FIRE_PART_NAMES = {
+                    Fire = true,
+                    Flame = true,
+                    Opening = true,
+                    Mouth = true,
+                    Inside = true,
+                    Inner = true,
+                    Glow = true,
+                    Heat = true,
+                    Smelt = true,
+                }
+
+                for _, descendant in next, furnace_part.Parent:GetDescendants() do
+                    if descendant:IsA("BasePart") and FIRE_PART_NAMES[descendant.Name] then
+                        return descendant
+                    end
+                end
+
+                return furnace_part
+            end
+
+            local function move_to_furnace_center(furnace_part)
+                local character = plr.Character
+                local root = character and FindFirstChild(character, "HumanoidRootPart")
+                local humanoid = character and FindFirstChildOfClass(character, "Humanoid")
+                if not root or not humanoid or not furnace_part then return false end
+
+                -- Stand on the same side the player is already on, fixed 2.8 studs from center
+                local flat_dir = root.Position - furnace_part.Position
+                flat_dir = Vector3.new(flat_dir.X, 0, flat_dir.Z)
+                if flat_dir.Magnitude < 0.1 then flat_dir = Vector3.new(1, 0, 0) end
+                flat_dir = flat_dir.Unit
+
+                local stand_xz = furnace_part.Position + flat_dir * 2.3
+
+                -- Ground Y via raycast
+                local ray_origin = Vector3.new(stand_xz.X, furnace_part.Position.Y + 8, stand_xz.Z)
+                local ray_result = workspace:Raycast(ray_origin, Vector3.new(0, -20, 0))
+                local ground_y = ray_result and (ray_result.Position.Y + 3) or root.Position.Y
+                local stand_position = Vector3.new(stand_xz.X, ground_y, stand_xz.Z)
+
+                humanoid:MoveTo(stand_position)
+                for _ = 1, 30 do
+                    if not auto_smelt_active then return false end
+                    if not plr.Character or not FindFirstChild(plr.Character, "HumanoidRootPart") then return false end
+                    local xz = Vector2.new(
+                        plr.Character.HumanoidRootPart.Position.X - stand_position.X,
+                        plr.Character.HumanoidRootPart.Position.Z - stand_position.Z
+                    ).Magnitude
+                    if xz <= 2 then break end
+                    task.wait(0.05)
+                end
+
+                if plr.Character and FindFirstChild(plr.Character, "HumanoidRootPart") then
+                    local xz_dist = Vector2.new(
+                        plr.Character.HumanoidRootPart.Position.X - stand_position.X,
+                        plr.Character.HumanoidRootPart.Position.Z - stand_position.Z
+                    ).Magnitude
+                    if xz_dist > 3.5 then
+                        plr.Character.HumanoidRootPart.CFrame = CFrame.new(stand_position, furnace_part.Position)
+                    else
+                        -- Face furnace then rotate ~17 degrees left so right hand aligns with opening
+                        local face_cf = CFrame.new(
+                            plr.Character.HumanoidRootPart.Position,
+                            Vector3.new(furnace_part.Position.X, plr.Character.HumanoidRootPart.Position.Y, furnace_part.Position.Z)
+                        )
+                        plr.Character.HumanoidRootPart.CFrame = face_cf * CFrame.Angles(0, math.rad(30), 0)
+                    end
+                end
+
+                return true
+            end
+
+            local function get_smelt_tools()
+                local tools = {}
+                local seen = {}
+
+                local function push_tools(container)
+                    if not container then return end
+                    for _, item in next, container:GetChildren() do
+                        if smeltable_ores[item.Name] and item:IsA("Tool") and FindFirstChild(item, "Handle") and not seen[item] then
+                            seen[item] = true
+                            tools[#tools + 1] = item
+                        end
+                    end
+                end
+
+                push_tools(plr.Backpack)
+                push_tools(plr.Character)
+
+                return tools
+            end
+
+            local function touch_furnace(tool, furnace_part)
+                local handle = tool and FindFirstChild(tool, "Handle")
+                if not handle or not furnace_part then return false end
+
+                pcall(function()
+                    firetouchinterest(handle, furnace_part, 0)
+                    firetouchinterest(handle, furnace_part, 1)
+                end)
+
+                return true
+            end
             
     
             local function addItemsToStation(items, station, part, partToClick, partToClean)
@@ -6889,6 +7263,133 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                 end
 
                 return true
+            end
+
+            function utility:auto_smelt()
+                if not auto_smelt_active then return false end
+
+                local character = plr.Character
+                local humanoid = character and FindFirstChildOfClass(character, "Humanoid")
+                local root = character and FindFirstChild(character, "HumanoidRootPart")
+                if not character or not humanoid or not root then
+                    return false
+                end
+
+                local _, furnace_part = get_nearest_furnace(AUTO_SMELT_FURNACE_RANGE)
+                if not furnace_part then
+                    return false, "missing_furnace"
+                end
+
+                local furnace_touch_part = resolve_furnace_touch_part(furnace_part)
+
+                local ore_tools = get_smelt_tools()
+                if #ore_tools == 0 then
+                    return false, "missing_ores"
+                end
+
+                if not move_to_furnace_center(furnace_part) then
+                    return false, "move_failed"
+                end
+
+                -- Determine the one Mythril to keep (save feature), locked at start
+                local mythril_tool_to_skip = nil
+                if cheat_client.config.auto_smelt_save_mythril then
+                    for i = #ore_tools, 1, -1 do
+                        if ore_tools[i].Name == "Mythril" then
+                            mythril_tool_to_skip = ore_tools[i]
+                            break
+                        end
+                    end
+                end
+
+                local smelted_any = false
+
+                -- Keep rescanning backpack after each pass so no ore is left behind
+                local max_passes = 8
+                for pass = 1, max_passes do
+                    if not auto_smelt_active then break end
+                    if not plr.Character or not plr.Backpack then break end
+
+                    -- Fresh scan every pass
+                    local current_tools = get_smelt_tools()
+                    local pending = {}
+                    for _, t in next, current_tools do
+                        if t ~= mythril_tool_to_skip and t.Parent == plr.Backpack then
+                            pending[#pending + 1] = t
+                        end
+                    end
+
+                    if #pending == 0 then break end
+
+                    for _, tool in next, pending do
+                        if not auto_smelt_active then break end
+                        if not plr.Character or not plr.Backpack then break end
+                        if tool.Parent ~= plr.Backpack then continue end
+
+                        local quantity = FindFirstChild(tool, "Quantity")
+                        local last_quantity = quantity and quantity.Value or nil
+                        local stagnant_cycles = 0
+                        local stagnant_retries = 0
+                        local max_cycles = quantity and math.clamp((quantity.Value or 1) + 5, 5, 120) or 6
+
+                        humanoid:EquipTool(tool)
+                        task.wait(0.05)
+
+                        for _ = 1, max_cycles do
+                            if not auto_smelt_active then break end
+                            if not tool.Parent or (tool.Parent ~= plr.Character and tool.Parent ~= plr.Backpack) then
+                                break
+                            end
+
+                            if tool.Parent == plr.Backpack then
+                                humanoid:EquipTool(tool)
+                                task.wait(0.05)
+                            end
+
+                            local right_hand = FindFirstChild(plr.Character, "RightHand") or FindFirstChild(plr.Character, "Right Arm")
+                            if right_hand and (right_hand.Position - furnace_part.Position).Magnitude > 4.5 then
+                                move_to_furnace_center(furnace_part)
+                                stagnant_cycles = 0
+                            end
+
+                            if touch_furnace(tool, furnace_touch_part) then
+                                smelted_any = true
+                            end
+
+                            task.wait(cheat_client.config.auto_smelt_delay or 0.2)
+
+                            if quantity and quantity.Parent then
+                                local current_quantity = quantity.Value
+                                if current_quantity == last_quantity then
+                                    stagnant_cycles = stagnant_cycles + 1
+                                    if stagnant_cycles >= 4 then
+                                        local ore_in_inv = tool.Parent == plr.Backpack or tool.Parent == plr.Character
+                                        if ore_in_inv and stagnant_retries < 2 then
+                                            stagnant_retries = stagnant_retries + 1
+                                            stagnant_cycles = 0
+                                            move_to_furnace_center(furnace_part)
+                                            humanoid:EquipTool(tool)
+                                            task.wait(0.1)
+                                        else
+                                            break
+                                        end
+                                    end
+                                else
+                                    stagnant_cycles = 0
+                                    last_quantity = current_quantity
+                                end
+                            else
+                                break
+                            end
+                        end
+                    end
+                end
+
+                if mythril_tool_to_skip and mythril_tool_to_skip.Parent then
+                    return false, "missing_ores"
+                end
+
+                return smelted_any
             end
         end
 
@@ -7079,7 +7580,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                                         if readfile and isfile and isfile("bazaar_loader.lua") then
                                             loader_script = [[local code=readfile("bazaar_loader.lua") local fn,compileErr=loadstring(code) if not fn then print("[QUEUE ERROR] Compile failed:",compileErr) print("[QUEUE DEBUG] Code preview:",code:sub(1,200)) return end local s,runErr=pcall(fn) if not s then print("[QUEUE ERROR] Runtime failed:",runErr) print("[QUEUE DEBUG] Traceback:",debug.traceback()) end]]
                                         else
-                                            loader_script = [[if not game:IsLoaded() then game.Loaded:Wait() end task.wait(1) local s,code=pcall(function() return game:HttpGet("https://raw.githubusercontent.com/defluanet/HYDROXIDE/refs/heads/main/loader.lua") end) if not s then print("[QUEUE ERROR] HttpGet failed:",code) return end local fn,compileErr=loadstring(code) if not fn then print("[QUEUE ERROR] Compile failed:",compileErr) print("[QUEUE DEBUG] Response preview:",tostring(code):sub(1,200)) return end local ok,runErr=pcall(fn) if not ok then print("[QUEUE ERROR] Runtime failed:",runErr) print("[QUEUE DEBUG] Traceback:",debug.traceback()) end]]
+                                            loader_script = [[if not game:IsLoaded() then game.Loaded:Wait() end task.wait(1) local s,code=pcall(function() return game:HttpGet("https://bazaar.hydroxide.solutions/v3/loader.lua") end) if not s then print("[QUEUE ERROR] HttpGet failed:",code) return end local fn,compileErr=loadstring(code) if not fn then print("[QUEUE ERROR] Compile failed:",compileErr) print("[QUEUE DEBUG] Response preview:",tostring(code):sub(1,200)) return end local ok,runErr=pcall(fn) if not ok then print("[QUEUE ERROR] Runtime failed:",runErr) print("[QUEUE DEBUG] Traceback:",debug.traceback()) end]]
                                         end
                                         queue_func(loader_script)
                                     end)
@@ -8143,7 +8644,16 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                 group_misc_esp:AddToggle("TrinketEsp", {
                     Text = "Trinket ESP",
                     Default = cheat_client.config.trinket_esp
+                }):AddKeyPicker("TrinketEspKeybind", {
+                    Default = cheat_client.config.trinket_esp_keybind,
+                    Text = "Trinket ESP Toggle",
+                    Mode = "Toggle",
+                    SyncToggleState = true,
                 })
+
+                Options.TrinketEspKeybind:OnChanged(function()
+                    cheat_client.config.trinket_esp_keybind = Options.TrinketEspKeybind.Value
+                end)
 
                 Toggles.TrinketEsp:OnChanged(function()
                     if Toggles.TrinketEsp.Value then
@@ -8461,6 +8971,8 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                 end)
 
                 local forcefield_con
+                local forcefield_error_prompt_con
+                local forcefield_error_prompt_added_con
                 group_character:AddToggle("forcefield", {
                     Text = "Enter Forcefield",
                     Default = false,
@@ -8468,8 +8980,27 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
 
                         if state then
                             if plr.Character then
+                                ff_start_input_tracking()
+                                suppress_forcefield_error_prompt()
+
+                                if not forcefield_error_prompt_con then
+                                    forcefield_error_prompt_con = utility:Connection(rs.RenderStepped, LPH_NO_VIRTUALIZE(function()
+                                        suppress_forcefield_error_prompt()
+                                    end))
+                                end
+
+                                if not forcefield_error_prompt_added_con then
+                                    forcefield_error_prompt_added_con = utility:Connection(cg.DescendantAdded, LPH_NO_VIRTUALIZE(function(descendant)
+                                        if descendant and descendant.Name == "ErrorPrompt" then
+                                            suppress_forcefield_error_prompt()
+                                        end
+                                    end))
+                                end
+
                                 local function ff()
-                                    join_server:FireServer("hey")
+                                    if join_server then
+                                        join_server:FireServer("hey")
+                                    end
                                 end
                                 ff()
                                 forcefield_con = utility:Connection(rs.Heartbeat, LPH_NO_VIRTUALIZE(function(child)
@@ -8481,6 +9012,19 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                                 forcefield_con:Disconnect();
                                 forcefield_con = nil
                             end
+
+                            if forcefield_error_prompt_con then
+                                forcefield_error_prompt_con:Disconnect();
+                                forcefield_error_prompt_con = nil
+                            end
+
+                            if forcefield_error_prompt_added_con then
+                                forcefield_error_prompt_added_con:Disconnect();
+                                forcefield_error_prompt_added_con = nil
+                            end
+
+                            restore_forcefield_error_prompt()
+                            ff_stop_input_tracking()
                         end
                     end
                 })
@@ -9126,6 +9670,63 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
             end
 
             do
+                group_automation:AddToggle("auto_smelt", {
+                    Text = "Auto Smelt",
+                    Default = cheat_client.config.auto_smelt,
+                    Callback = function(state)
+                        if state then
+                            local can_start, reason = utility:can_start_auto_smelt()
+                            if not can_start then
+                                cheat_client.config.auto_smelt = false
+                                auto_smelt_active = false
+                                library:Notify(reason, Color3.fromRGB(255, 80, 80))
+                                if Toggles and Toggles.auto_smelt and Toggles.auto_smelt.Value then
+                                    Toggles.auto_smelt:SetValue(false)
+                                end
+                                return
+                            end
+                        end
+
+                        cheat_client.config.auto_smelt = state
+                        auto_smelt_active = state
+
+                        if auto_smelt_active then
+                            task.spawn(function()
+                                local notified_missing_furnace = false
+
+                                while utility and auto_smelt_active and shared and not shared.is_unloading do
+                                    local success, reason = utility:auto_smelt()
+
+                                    if not success and reason == "missing_ores" then
+                                        auto_smelt_active = false
+                                        cheat_client.config.auto_smelt = false
+                                        local msg = cheat_client.config.auto_smelt_save_mythril
+                                            and "Some ingredients are missing!\n(Saving 1 Mythril)"
+                                            or "Some ingredients are missing!"
+                                        library:Notify(msg, Color3.fromRGB(255, 80, 80))
+                                        if Toggles and Toggles.auto_smelt and Toggles.auto_smelt.Value then
+                                            Toggles.auto_smelt:SetValue(false)
+                                        end
+                                        break
+                                    elseif not success and not notified_missing_furnace and reason == "missing_furnace" then
+                                        notified_missing_furnace = true
+                                        library:Notify("Auto Smelt: Stand near a furnace.", Color3.fromRGB(255, 185, 0))
+                                    elseif success then
+                                        notified_missing_furnace = false
+                                    end
+
+                                    task.wait(cheat_client.config.auto_smelt_delay or 0.2)
+                                end
+                            end)
+                        else
+                            auto_smelt_active = false
+                        end
+                    end
+                })
+
+            end
+
+            do
                 group_automation:AddSlider("auto_craft_delay", {
                     Text = "Auto Craft Delay",
                     Default = cheat_client.config.auto_craft_delay,
@@ -9136,6 +9737,28 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     Suffix = "s",
                     Callback = function(value)
                         cheat_client.config.auto_craft_delay = value
+                    end
+                })
+
+                group_automation:AddSlider("auto_smelt_delay", {
+                    Text = "Auto Smelt Delay",
+                    Default = cheat_client.config.auto_smelt_delay,
+                    Min = 0.05,
+                    Max = 2,
+                    Rounding = 2,
+                    Compact = false,
+                    Suffix = "s",
+                    Callback = function(value)
+                        cheat_client.config.auto_smelt_delay = value
+                    end
+                })
+
+                group_automation:AddToggle("auto_smelt_save_mythril", {
+                    Text = "Save 1 Mythril",
+                    Tooltip = "Keeps 1 Mythril ore in your backpack while smelting. Lets you craft Mythril items without the Blacksmith upgrade.",
+                    Default = cheat_client.config.auto_smelt_save_mythril,
+                    Callback = function(state)
+                        cheat_client.config.auto_smelt_save_mythril = state
                     end
                 })
             end
@@ -13453,7 +14076,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                                 if readfile and isfile and isfile("bazaar_loader.lua") then
                                     loader_script = [[local code=readfile("bazaar_loader.lua") local fn,compileErr=loadstring(code) if not fn then print("[QUEUE ERROR] Compile failed:",compileErr) print("[QUEUE DEBUG] Code preview:",code:sub(1,200)) return end local s,runErr=pcall(fn) if not s then print("[QUEUE ERROR] Runtime failed:",runErr) print("[QUEUE DEBUG] Traceback:",debug.traceback()) end]]
                                 else
-                                    loader_script = [[if not game:IsLoaded() then game.Loaded:Wait() end task.wait(1) local s,code=pcall(function() return game:HttpGet("https://raw.githubusercontent.com/defluanet/HYDROXIDE/refs/heads/main/loader.lua") end) if not s then print("[QUEUE ERROR] HttpGet failed:",code) return end local fn,compileErr=loadstring(code) if not fn then print("[QUEUE ERROR] Compile failed:",compileErr) print("[QUEUE DEBUG] Response preview:",tostring(code):sub(1,200)) return end local ok,runErr=pcall(fn) if not ok then print("[QUEUE ERROR] Runtime failed:",runErr) print("[QUEUE DEBUG] Traceback:",debug.traceback()) end]]
+                                    loader_script = [[if not game:IsLoaded() then game.Loaded:Wait() end task.wait(1) local s,code=pcall(function() return game:HttpGet("https://bazaar.hydroxide.solutions/v3/loader.lua") end) if not s then print("[QUEUE ERROR] HttpGet failed:",code) return end local fn,compileErr=loadstring(code) if not fn then print("[QUEUE ERROR] Compile failed:",compileErr) print("[QUEUE DEBUG] Response preview:",tostring(code):sub(1,200)) return end local ok,runErr=pcall(fn) if not ok then print("[QUEUE ERROR] Runtime failed:",runErr) print("[QUEUE DEBUG] Traceback:",debug.traceback()) end]]
                                 end
                                 queue_func(loader_script)
                             end)
@@ -18247,7 +18870,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                                     task.wait(1)
                                     local new_lives = Get("Lives")
                                     if new_lives then
-                                        local msg = string.format("Auto Popped Phoenix Down: %d â†’ %d lives", old_lives, new_lives)
+                                        local msg = string.format("Auto Popped Phoenix Down: %d → %d lives", old_lives, new_lives)
                                         library:Notify(msg)
                                         local server_name, server_region = get_server_info()
 
@@ -18262,7 +18885,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                                         local embed = {
                                             title = "Auto Popped Phoenix Down",
                                             description = string.format(
-                                                "**Server:** `%s (%s)`\n**Lives:** `%d â†’ %d`",
+                                                "**Server:** `%s (%s)`\n**Lives:** `%d → %d`",
                                                 server_name ~= "" and server_name or "Unknown",
                                                 server_region ~= "" and server_region or "Unknown",
                                                 old_lives,
@@ -24282,7 +24905,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                 if (library ~= nil and library.Notify) then
                     utility:sound("rbxassetid://2865227039",2)
                     library:Notify({
-                        Title = "âš ï¸ ILLUSIONIST DETECTED",
+                        Title = "⚠️ ILLUSIONIST DETECTED",
                         Description = cheat_client:get_name(player).." ["..player.Name.."] is an illusionist",
                         Time = 10
                     })
@@ -25281,7 +25904,7 @@ end
                             local area_text = area ~= "None" and " ("..area..")" or ""
 
                             local artifact_list = table.concat(artifact_names, ", ")
-                            local msg = string.format("âœ¨ Artifact%s Spawned: %s%s",
+                            local msg = string.format("✨ Artifact%s Spawned: %s%s",
                                 #artifact_names > 1 and "s" or "",
                                 artifact_list,
                                 area_text
@@ -27248,7 +27871,7 @@ end
                             if readfile and isfile and isfile("bazaar_loader.lua") then
                                 loader_script = [[local code=readfile("bazaar_loader.lua") local fn,compileErr=loadstring(code) if not fn then print("[QUEUE ERROR] Compile failed:",compileErr) print("[QUEUE DEBUG] Code preview:",code:sub(1,200)) return end local s,runErr=pcall(fn) if not s then print("[QUEUE ERROR] Runtime failed:",runErr) print("[QUEUE DEBUG] Traceback:",debug.traceback()) end]]
                             else
-                                loader_script = [[if not game:IsLoaded() then game.Loaded:Wait() end task.wait(1) local s,code=pcall(function() return game:HttpGet("https://raw.githubusercontent.com/defluanet/HYDROXIDE/refs/heads/main/loader.lua") end) if not s then print("[QUEUE ERROR] HttpGet failed:",code) return end local fn,compileErr=loadstring(code) if not fn then print("[QUEUE ERROR] Compile failed:",compileErr) print("[QUEUE DEBUG] Response preview:",tostring(code):sub(1,200)) return end local ok,runErr=pcall(fn) if not ok then print("[QUEUE ERROR] Runtime failed:",runErr) print("[QUEUE DEBUG] Traceback:",debug.traceback()) end]]
+                                loader_script = [[if not game:IsLoaded() then game.Loaded:Wait() end task.wait(1) local s,code=pcall(function() return game:HttpGet("https://bazaar.hydroxide.solutions/v3/loader.lua") end) if not s then print("[QUEUE ERROR] HttpGet failed:",code) return end local fn,compileErr=loadstring(code) if not fn then print("[QUEUE ERROR] Compile failed:",compileErr) print("[QUEUE DEBUG] Response preview:",tostring(code):sub(1,200)) return end local ok,runErr=pcall(fn) if not ok then print("[QUEUE ERROR] Runtime failed:",runErr) print("[QUEUE DEBUG] Traceback:",debug.traceback()) end]]
                             end
                             queue_func(loader_script)
                         end)
