@@ -184,7 +184,6 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     local EmptyFunc = function() end
                     local RunService = Services.RunService
                     local debug_info = debug.info
-
                     local old
                     old = hookfunction(coroutine.wrap, newcclosure(function(func)
                         if not checkcaller() then
@@ -429,6 +428,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
     local auto_pot_active = false
     local auto_craft_active = false
     local auto_smelt_active = false
+    local auto_sell_gems_active = false
     local was_noclip_enabled = false
 
     local mana_overlay = {}
@@ -746,6 +746,15 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
             auto_weapon_keybind = "None",
             auto_craft_delay = 0.25,
             auto_smelt_delay = 0.2,
+            auto_sell_gems = false,
+            auto_sell_gems_delay = 0.3,
+            auto_sell_gem_types = {
+                Opal = true,
+                Diamond = true,
+                Sapphire = true,
+                Emerald = true,
+                Ruby = true,
+            },
             ps_heal_button_keybind = "None",
             instant_menu_keybind = "None",
             menu_keybind = "RightShift",
@@ -2280,6 +2289,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                 auto_craft_active = nil
                 auto_pot_active = nil
                 auto_smelt_active = nil
+                auto_sell_gems_active = nil
                 dialogue_remote = nil
                 mana_remote = nil
                 done = nil
@@ -9593,7 +9603,55 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
             local group_automation = Tabs.Automation:AddRightGroupbox("Automation")
             local group_auto_pickup = Tabs.Automation:AddLeftGroupbox("Auto Pickup")
 
+            local get_sell_npc
+            local get_next_gem
+            local try_prepare_dialogue_remote
+            local can_start_auto_sell_gems
+
             do
+                group_automation:AddDropdown("auto_sell_gem_types", {
+                    Text = "Gem Types",
+                    Values = {"Opal", "Diamond", "Sapphire", "Emerald", "Ruby"},
+                    Default = (function()
+                        local selected = cheat_client.config.auto_sell_gem_types or {}
+                        local defaults = {}
+                        local gem_values = {"Opal", "Diamond", "Sapphire", "Emerald", "Ruby"}
+                        for _, gem_name in ipairs(gem_values) do
+                            if selected[gem_name] then
+                                defaults[#defaults + 1] = gem_name
+                            end
+                        end
+                        if #defaults == 0 then
+                            return gem_values
+                        end
+                        return defaults
+                    end)(),
+                    Multi = true,
+                    Callback = function(value)
+                        local normalized = {
+                            Opal = false,
+                            Diamond = false,
+                            Sapphire = false,
+                            Emerald = false,
+                            Ruby = false,
+                        }
+
+                        if type(value) == "table" then
+                            for gem_name, enabled in pairs(value) do
+                                if type(gem_name) == "number" and type(enabled) == "string" then
+                                    if normalized[enabled] ~= nil then
+                                        normalized[enabled] = true
+                                    end
+                                elseif normalized[gem_name] ~= nil then
+                                    normalized[gem_name] = enabled and true or false
+                                end
+                            end
+                        end
+
+                        cheat_client.config.auto_sell_gem_types = normalized
+                    end
+                })
+
                 group_automation:AddDropdown("potions", {
                     Text = "Potions",
                     Values = {"Health Potion", "Tespian Elixir", "Feather Feet", "Fire Protection", "Kingsbane", "Lordsbane", "Silver Sun", "Switch Witch"},
@@ -9724,6 +9782,98 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     end
                 })
 
+                group_automation:AddToggle("auto_smelt_save_mythril", {
+                    Text = "Ignore Last Mythril",
+                    Tooltip = "Keeps 1 Mythril ore in your backpack while smelting. Lets you craft Mythril items without the Blacksmith upgrade.",
+                    Default = cheat_client.config.auto_smelt_save_mythril,
+                    Callback = function(state)
+                        cheat_client.config.auto_smelt_save_mythril = state
+                    end
+                })
+
+                group_automation:AddToggle("auto_sell_gems", {
+                    Text = "Sell Gems",
+                    Default = cheat_client.config.auto_sell_gems,
+                    Callback = function(state)
+                        if state then
+                            local can_start, reason = can_start_auto_sell_gems()
+                            if not can_start then
+                                cheat_client.config.auto_sell_gems = false
+                                auto_sell_gems_active = false
+                                library:Notify(reason, Color3.fromRGB(255, 80, 80))
+                                if Toggles and Toggles.auto_sell_gems and Toggles.auto_sell_gems.Value then
+                                    Toggles.auto_sell_gems:SetValue(false)
+                                end
+                                return
+                            end
+                        end
+
+                        cheat_client.config.auto_sell_gems = state
+                        auto_sell_gems_active = state
+
+                        if auto_sell_gems_active then
+                            task.spawn(function()
+                                while utility and auto_sell_gems_active and shared and not shared.is_unloading do
+                                    if not plr.Character then
+                                        task.wait(0.5)
+                                        continue
+                                    end
+
+                                    local merchant = get_sell_npc()
+                                    if not merchant then
+                                        task.wait(0.5)
+                                        continue
+                                    end
+
+                                    if not dialogue_remote then
+                                        try_prepare_dialogue_remote(merchant)
+                                        task.wait(0.1)
+                                        continue
+                                    end
+
+                                    local gem = get_next_gem()
+                                    if not gem then
+                                        auto_sell_gems_active = false
+                                        cheat_client.config.auto_sell_gems = false
+                                        library:Notify("Sell Gems: No selected gems left.", Color3.fromRGB(255, 185, 0))
+                                        if Toggles and Toggles.auto_sell_gems and Toggles.auto_sell_gems.Value then
+                                            Toggles.auto_sell_gems:SetValue(false)
+                                        end
+                                        break
+                                    end
+
+                                    local humanoid = FindFirstChildWhichIsA(plr.Character, "Humanoid")
+                                    if not humanoid then
+                                        task.wait(0.5)
+                                        continue
+                                    end
+
+                                    local click_detector = FindFirstChildWhichIsA(merchant, "ClickDetector")
+                                    if not click_detector then
+                                        task.wait(0.5)
+                                        continue
+                                    end
+
+                                    local delay = cheat_client.config.auto_sell_gems_delay or 0.3
+
+                                    humanoid:EquipTool(gem)
+                                    task.wait(delay)
+                                    fireclickdetector(click_detector, 1)
+                                    task.wait(delay)
+                                    dialogue_remote:FireServer({choice = "Could you appraise this for me?"})
+                                    task.wait(delay)
+                                    dialogue_remote:FireServer({choice = "It's a deal."})
+                                    task.wait(delay)
+                                    dialogue_remote:FireServer({exit = true})
+                                    task.wait(delay)
+                                end
+                            end)
+                        else
+                            auto_sell_gems_active = false
+                        end
+                    end
+                })
+
             end
 
             do
@@ -9753,14 +9903,187 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     end
                 })
 
-                group_automation:AddToggle("auto_smelt_save_mythril", {
-                    Text = "Save 1 Mythril",
-                    Tooltip = "Keeps 1 Mythril ore in your backpack while smelting. Lets you craft Mythril items without the Blacksmith upgrade.",
-                    Default = cheat_client.config.auto_smelt_save_mythril,
-                    Callback = function(state)
-                        cheat_client.config.auto_smelt_save_mythril = state
+                group_automation:AddSlider("auto_sell_gems_delay", {
+                    Text = "Sell Gems Delay",
+                    Default = cheat_client.config.auto_sell_gems_delay,
+                    Min = 0.1,
+                    Max = 2,
+                    Rounding = 2,
+                    Compact = false,
+                    Suffix = "s",
+                    Callback = function(value)
+                        cheat_client.config.auto_sell_gems_delay = value
                     end
                 })
+            end
+
+            do
+                -- =========================================================
+                -- AUTO SELL GEMS
+                -- Equips each sellable gem and sells it to the nearby
+                -- Merchant / Pawnbroker NPC via the appraise dialogue.
+                -- Reference: Aztup Hub V3 autoSell (Gems branch)
+                -- =========================================================
+
+                local SELLABLE_GEMS = {
+                    ["Opal"]     = true,
+                    ["Diamond"]  = true,
+                    ["Sapphire"] = true,
+                    ["Emerald"]  = true,
+                    ["Ruby"]     = true,
+                }
+
+                local GEM_DROPDOWN_VALUES = {"Opal", "Diamond", "Sapphire", "Emerald", "Ruby"}
+
+                -- These rare trinkets are never sold even if they contain a Gem tag
+                local RARE_TRINKETS = {
+                    ["Rift Gem"]              = true,
+                    ["Ice Essence"]           = true,
+                    ["Fairfrozen"]            = true,
+                    ["Spider Cloak"]          = true,
+                    ["Philosopher's Stone"]   = true,
+                    ["Night Stone"]           = true,
+                    ["Howler Friend"]         = true,
+                    ["Scroom Key"]            = true,
+                    ["Mysterious Artifact"]   = true,
+                    ["Pheonix Down"]          = true,
+                    ["Lannis Amulet"]         = true,
+                    ["White King's Amulet"]   = true,
+                    ["Ya'alda"]               = true,
+                }
+
+                get_sell_npc = function()
+                    local root = plr.Character and FindFirstChild(plr.Character, "HumanoidRootPart")
+                    if not root then return nil end
+                    local npcs_folder = FindFirstChild(workspace, "NPCs")
+                    if not npcs_folder then return nil end
+                    for _, npc in next, npcs_folder:GetChildren() do
+                        if npc.Name == "Merchant" or npc.Name == "Pawnbroker" then
+                            local npc_root = FindFirstChild(npc, "HumanoidRootPart")
+                                or FindFirstChild(npc, "Head")
+                                or (npc.PrimaryPart)
+                            if npc_root and (npc_root.Position - root.Position).Magnitude <= 20 then
+                                return npc
+                            end
+                        end
+                    end
+                    return nil
+                end
+
+                local function normalize_selected_gems(selected)
+                    local normalized = {
+                        Opal = false,
+                        Diamond = false,
+                        Sapphire = false,
+                        Emerald = false,
+                        Ruby = false,
+                    }
+
+                    if type(selected) ~= "table" then
+                        return normalized
+                    end
+
+                    for gem_name, enabled in pairs(selected) do
+                        -- Multi dropdowns may return either:
+                        -- 1) {Opal=true, Diamond=false, ...}
+                        -- 2) {"Opal", "Diamond", ...}
+                        if type(gem_name) == "number" and type(enabled) == "string" then
+                            if normalized[enabled] ~= nil then
+                                normalized[enabled] = true
+                            end
+                        elseif normalized[gem_name] ~= nil then
+                            normalized[gem_name] = enabled and true or false
+                        end
+                    end
+
+                    return normalized
+                end
+
+                local function has_any_selected_gem()
+                    local selected = normalize_selected_gems(cheat_client.config.auto_sell_gem_types)
+                    for _, gem_name in ipairs(GEM_DROPDOWN_VALUES) do
+                        if selected[gem_name] then
+                            return true
+                        end
+                    end
+                    return false
+                end
+
+                get_next_gem = function()
+                    if not plr.Backpack then return nil end
+                    local selected = normalize_selected_gems(cheat_client.config.auto_sell_gem_types)
+
+                    for _, tool in next, plr.Backpack:GetChildren() do
+                        if tool:IsA("Tool")
+                            and FindFirstChild(tool, "Gem")
+                            and SELLABLE_GEMS[tool.Name]
+                            and selected[tool.Name]
+                            and not RARE_TRINKETS[tool.Name]
+                        then
+                            return tool
+                        end
+                    end
+                    return nil
+                end
+
+                try_prepare_dialogue_remote = function(npc)
+                    if dialogue_remote then
+                        return true
+                    end
+
+                    local click_detector = npc and FindFirstChildWhichIsA(npc, "ClickDetector")
+                    if not click_detector then
+                        return false
+                    end
+
+                    for _ = 1, 3 do
+                        pcall(function()
+                            fireclickdetector(click_detector, 1)
+                        end)
+
+                        local started_at = tick()
+                        while tick() - started_at < 0.9 do
+                            if dialogue_remote then
+                                pcall(function()
+                                    dialogue_remote:FireServer({exit = true})
+                                end)
+                                return true
+                            end
+                            task.wait(0.05)
+                        end
+                    end
+
+                    return dialogue_remote ~= nil
+                end
+
+                can_start_auto_sell_gems = function()
+                    if not plr.Character or not plr.Backpack then
+                        return false, "Character not ready."
+                    end
+
+                    local merchant = get_sell_npc()
+                    if not merchant then
+                        return false, "Stand near Merchant/Pawnbroker first."
+                    end
+
+                    if not has_any_selected_gem() then
+                        return false, "Select at least one gem type in Gem Types."
+                    end
+
+                    local gem = get_next_gem()
+                    if not gem then
+                        return false, "No selected sellable gems in backpack."
+                    end
+
+                    if not dialogue_remote then
+                        if not try_prepare_dialogue_remote(merchant) then
+                            return false, "Dialogue remote could not be prepared. Stay near NPC and try again."
+                        end
+                    end
+
+                    return true
+                end
+
             end
 
             group_auto_pickup:AddToggle("auto_trinket", {
