@@ -8637,6 +8637,18 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                 end
             })
 
+            group_overlays:AddToggle("SnapGateSpy", {
+                Text = "Snap Gate Spy",
+                Default = false,
+                Callback = function(value)
+                    if value then
+                        cheat_client.setup_snap_gate_spy()
+                    else
+                        cheat_client.cleanup_snap_gate_spy()
+                    end
+                end
+            })
+
             group_overlays:AddToggle("better_leaderboard", {
                 Text = "Better Leaderboard",
                 Default = cheat_client.config.better_leaderboard,
@@ -10567,6 +10579,206 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                         state.last_count = observe_count
                     end
                 end))
+            end
+
+            -- Snap Gate Spy
+            cheat_client.snap_gate_spy = cheat_client.snap_gate_spy or {
+                connections = {},
+                pending = {},
+            }
+
+            cheat_client.cleanup_snap_gate_spy = function()
+                local state = cheat_client.snap_gate_spy
+                for _, conn in ipairs(state.connections) do
+                    if conn then pcall(function() conn:Disconnect() end) end
+                end
+                state.connections = {}
+                state.pending = {}
+            end
+
+            local SNAP_GATE_ANIM_ID2 = "2818022247" -- confirmed snap gate animation
+
+            local GATE_LOCATIONS = {
+                { name = "Sigil",                    pos = Vector3.new( 6583.52,  1326.04,   461.43), radius = 300 },
+                { name = "Tundra 1",                 pos = Vector3.new( 3836.03,   582.54,     8.43), radius = 300 },
+                { name = "Tundra 2",                 pos = Vector3.new( 3952.03,   567.54,  -506.07), radius = 300 },
+                { name = "Tundra 3",                 pos = Vector3.new( 4800.52,   591.04, -1133.57), radius = 300 },
+                { name = "Tundra 4",                 pos = Vector3.new( 6579.02,   551.54,  -985.09), radius = 300 },
+                { name = "Tundra 5",                 pos = Vector3.new( 5936.36,  1320.29,   103.49), radius = 300 },
+                { name = "Tundra 6",                 pos = Vector3.new( 5500.03,  1073.54,   899.92), radius = 300 },
+                { name = "Tundra 7",                 pos = Vector3.new( 4887.53,  1123.54,  1767.93), radius = 300 },
+                { name = "Snail",                    pos = Vector3.new( 5789.52,  1120.04,   869.43), radius = 300 },
+                { name = "Forest 1",                 pos = Vector3.new( 1727.75,   165.75,   684.75), radius = 300 },
+                { name = "Forest 2",                 pos = Vector3.new( 2515.63,   218.75,  -448.21), radius = 300 },
+                { name = "Forest 3",                 pos = Vector3.new( 2596.53,   315.25,   213.25), radius = 300 },
+                { name = "Forest 4",                 pos = Vector3.new( 2281.75,   155.75,   948.25), radius = 300 },
+                { name = "Forest 5",                 pos = Vector3.new( 1796.74,   123.04,  -581.57), radius = 300 },
+                { name = "Desert 1",                 pos = Vector3.new(-2063.15,   722.66,  -223.79), radius = 300 },
+                { name = "Desert 2",                 pos = Vector3.new(-1150.57,   332.34,   726.66), radius = 300 },
+                { name = "Desert 3",                 pos = Vector3.new(-1824.27,   307.84,   642.66), radius = 300 },
+                { name = "Desert 4",                 pos = Vector3.new( -433.70,   242.14,   200.10), radius = 300 },
+                { name = "Desert 5",                 pos = Vector3.new(-2003.15,   677.66,  -693.79), radius = 300 },
+                { name = "Shore 1",                  pos = Vector3.new(  671.31,   364.95,  2386.65), radius = 300 },
+                { name = "Shore 2",                  pos = Vector3.new( 1413.57,   282.90,  1400.80), radius = 300 },
+                { name = "Shore 3",                  pos = Vector3.new( 1590.66,   365.70,  2260.05), radius = 300 },
+                { name = "Shore 4",                  pos = Vector3.new( 1434.50,   436.95,  2830.85), radius = 300 },
+                { name = "Deep Forest 1",            pos = Vector3.new( 1610.11,    84.62, -2609.37), radius = 300 },
+                { name = "Deep Forest 2",            pos = Vector3.new( 1099.11,   167.62, -3150.37), radius = 300 },
+                { name = "Deep Forest 3",            pos = Vector3.new( 1006.11,    47.12, -3213.37), radius = 300 },
+                { name = "Deep Forest 4",            pos = Vector3.new( 2610.61,   140.62, -2502.87), radius = 300 },
+                { name = "Deep Forest 5",            pos = Vector3.new( 2011.61,   203.61, -2009.37), radius = 300 },
+                { name = "Skycastle",               pos = Vector3.new(  538.29,  3707.90,   -48.28), radius = 300 },
+                { name = "Temple of Altum",          pos = Vector3.new( 1453.14,  -305.54, -5819.00), radius = 350 },
+                { name = "The All-Dark",             pos = Vector3.new(    0.52,  -110.96,  -216.57), radius = 350 },
+            }
+
+            local BACKFIRE_LOCATIONS = { ["Temple of Altum"] = true, ["The All-Dark"] = true }
+
+            local function resolve_location_name(pos)
+                local best_name, best_dist = nil, math.huge
+                for _, loc in ipairs(GATE_LOCATIONS) do
+                    local d = (pos - loc.pos).Magnitude
+                    if d <= loc.radius and d < best_dist then
+                        best_dist = d
+                        best_name = loc.name
+                    end
+                end
+                return best_name  -- nil if no match
+            end
+
+            cheat_client.setup_snap_gate_spy = function()
+                if not (Toggles and Toggles.SnapGateSpy and Toggles.SnapGateSpy.Value) then return end
+                cheat_client.cleanup_snap_gate_spy()
+
+                local state = cheat_client.snap_gate_spy
+
+                -- Chat buffer: kept as supplemental info (e.g. Azael in Danger writes random dest)
+                local chat_buffer = {}
+                local function buffer_chat(p, message)
+                    table.insert(chat_buffer, { player_id = p.UserId, message = tostring(message), time = tick() })
+                    while #chat_buffer > 40 do table.remove(chat_buffer, 1) end
+                end
+                local function lookup_chat(player_id, within)
+                    local now = tick()
+                    for i = #chat_buffer, 1, -1 do
+                        local e = chat_buffer[i]
+                        if e.player_id == player_id and (now - e.time) <= within then return e.message end
+                    end
+                end
+
+                -- Capture chat from game:GetService("Chat").Chatted
+                local ok, raw_chat = pcall(function() return game:GetService("Chat") end)
+                if ok and raw_chat and raw_chat.Chatted then
+                    local cc = utility:Connection(raw_chat.Chatted, function(part, message)
+                        if not (Toggles and Toggles.SnapGateSpy and Toggles.SnapGateSpy.Value) then return end
+                        local tp = plrs:GetPlayerFromCharacter(part) or plrs:GetPlayerFromCharacter(part and part.Parent)
+                        if tp and tp ~= plr then buffer_chat(tp, message) end
+                    end)
+                    table.insert(state.connections, cc)
+                end
+
+                local function watch_player(target_player)
+                    if not target_player or target_player == plr then return end
+
+                    local function check_character(character)
+                        if not character then return end
+                        local humanoid = FindFirstChildOfClass(character, "Humanoid")
+                        if not humanoid then return end
+                        local animator = FindFirstChildOfClass(humanoid, "Animator")
+                        if not animator then return end
+
+                        local anim_conn
+                        anim_conn = utility:Connection(animator.AnimationPlayed, function(track)
+                            if not (Toggles and Toggles.SnapGateSpy and Toggles.SnapGateSpy.Value) then
+                                if anim_conn then anim_conn:Disconnect() end
+                                return
+                            end
+                            if not track.Animation then return end
+                            local anim_id = tostring(track.Animation.AnimationId)
+                            if not string.find(anim_id, SNAP_GATE_ANIM_ID2) then return end
+                            if not FindFirstChild(character, "Gate") then return end
+
+                            local ingame_name = cheat_client:get_name(target_player)
+                            local player_name = (ingame_name and ingame_name ~= "nil")
+                                and (ingame_name .. " [" .. target_player.Name .. "]")
+                                or target_player.Name
+                            local hrp = character.HumanoidRootPart
+                            if not hrp then return end
+                            local pre_pos = hrp.Position
+
+                            library:Notify(string.format("[GATE] %s is snap gating!", player_name), Color3.fromRGB(255, 200, 50))
+
+                            -- Poll for actual position change (source of truth)
+                            task.spawn(function()
+                                local poll_start = tick()
+                                local teleported = false
+
+                                while (tick() - poll_start) < 4 do
+                                    task.wait(0.1)
+                                    if not character or not character.HumanoidRootPart then break end
+                                    local cur_pos = character.HumanoidRootPart.Position
+                                    local delta = (cur_pos - pre_pos).Magnitude
+
+                                    if delta > 150 then
+                                        teleported = true
+                                        local dest_name = resolve_location_name(cur_pos)
+
+                                        -- Distance from local player to destination
+                                        local local_dist = 0
+                                        if plr.Character and FindFirstChild(plr.Character, "HumanoidRootPart") then
+                                            local_dist = math.floor((plr.Character.HumanoidRootPart.Position - cur_pos).Magnitude)
+                                        end
+
+                                        local is_backfire = dest_name and BACKFIRE_LOCATIONS[dest_name]
+                                        local dest_display = dest_name or string.format("(%.0f, %.0f, %.0f)", cur_pos.X, cur_pos.Y, cur_pos.Z)
+
+                                        if is_backfire then
+                                            library:Notify(string.format("[GATE] %s Backfired\n→ %s", player_name, dest_display), Color3.fromRGB(80, 80, 80))
+                                        else
+                                            local threat_color = Color3.fromRGB(100, 220, 100)
+                                            if local_dist <= 300 then
+                                                threat_color = Color3.fromRGB(255, 60, 60)
+                                            elseif local_dist <= 800 then
+                                                threat_color = Color3.fromRGB(255, 160, 30)
+                                            end
+                                            library:Notify(string.format("[GATE] %s Successfully\n→ %s", player_name, dest_display), threat_color)
+                                        end
+                                        break
+                                    end
+                                end
+
+                                if not teleported then
+                                    local chat_msg = lookup_chat(target_player.UserId, 5)
+                                    if chat_msg and string.lower(chat_msg):find("cancel") then
+                                        library:Notify(string.format("[GATE] %s Cancelled", player_name), Color3.fromRGB(160, 160, 160))
+                                    else
+                                        library:Notify(string.format("[GATE] %s Failed", player_name), Color3.fromRGB(160, 160, 160))
+                                    end
+                                end
+                            end)
+                        end)
+                        table.insert(state.connections, anim_conn)
+                    end
+
+                    check_character(target_player.Character)
+
+                    local respawn_conn = utility:Connection(target_player.CharacterAdded, function(char)
+                        task.wait(0.5)
+                        check_character(char)
+                    end)
+                    table.insert(state.connections, respawn_conn)
+                end
+
+                for _, p in next, plrs:GetPlayers() do
+                    watch_player(p)
+                end
+
+                local join_conn = utility:Connection(plrs.PlayerAdded, function(p)
+                    if Toggles and Toggles.SnapGateSpy and Toggles.SnapGateSpy.Value then
+                        watch_player(p)
+                    end
+                end)
+                table.insert(state.connections, join_conn)
             end
 
         end
