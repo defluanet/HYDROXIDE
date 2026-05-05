@@ -43,7 +43,7 @@ loadstring([[
 ]])();
 
 pcall(loadstring([[if not HXD_HWID then HXD_HWID="STUB_HWID" HXD_DISCORD_ID="123456789" HXD_EXPIRES_AT=os.time()+2592000 HXD_STATUS="active" HXD_EXECUTION_COUNT=1 HXD_SECONDS_LEFT=2592000 HXD_UserNote="beta" end]]));
-pcall(loadstring([[if not HXD_SANITIZE then function HXD_SANITIZE(value,pattern)if not value or not pattern then return""end;value=tostring(value)local charset=pattern:match("%[(.-)%]")if not charset then return""end;local _,max=pattern:match("{%s*(%d+)%s*,%s*(%d+)%s*}")local max_len=tonumber(max)or#value;local extra_chars="→←↑↓★☆"charset=charset:gsub("%]","%%]")value=value:gsub("[^"..charset..extra_chars.."]","")return value:sub(1,max_len)end end]]));
+pcall(loadstring([[if not HXD_SANITIZE then function HXD_SANITIZE(value,pattern)if not value or not pattern then return""end;value=tostring(value)local charset=pattern:match("%[(.-)%]")if not charset then return""end;local _,max=pattern:match("{%s*(%d+)%s*,%s*(%d+)%s*}")local max_len=tonumber(max)or#value;local extra_chars="��^v??"charset=charset:gsub("%]","%%]")value=value:gsub("[^"..charset..extra_chars.."]","")return value:sub(1,max_len)end end]]));
 do
     local existing = rawget(getgenv(), "HXD_SEND_WEBHOOK")
     if not existing or (type(existing) ~= "function" and type(existing) ~= "table") then
@@ -216,6 +216,8 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
         else
             makefolder("HYDROXIDE\\configs")
         end
+        makefolder("HYDROXIDE\\blacksmith_paths")
+        makefolder("HYDROXIDE\\trinket_paths")
     end
 
     local cas  = Services.ContextActionService
@@ -429,6 +431,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
     local auto_craft_active = false
     local auto_smelt_active = false
     local auto_sell_gems_active = false
+    local blacksmith_collect_active = false
     local was_noclip_enabled = false
 
     local mana_overlay = {}
@@ -697,6 +700,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
             auto_cast_verdien_unequip_on_stop = true,
             auto_smelt = false,
             auto_smelt_save_mythril = false,
+            blacksmith_collect_speed = 130,
             auto_bag = false,
             show_bag_range = false,
             bag_range = 80,
@@ -2290,6 +2294,10 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                 auto_pot_active = nil
                 auto_smelt_active = nil
                 auto_sell_gems_active = nil
+                blacksmith_collect_active = nil
+                if cheat_client.blacksmith_bot then
+                    cheat_client.blacksmith_bot.path_running = false
+                end
                 dialogue_remote = nil
                 mana_remote = nil
                 done = nil
@@ -3545,7 +3553,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                         if player_rank ~= "Guest" and (library ~= nil and library.Notify) then
                             utility:sound("rbxassetid://1693890393",4)
                             library:Notify({
-                                Title = "🛑 MODERATOR DETECTED",
+                                Title = "?? MODERATOR DETECTED",
                                 Description = player.Name.." is a Moderator",
                                 Time = 25
                             })
@@ -3591,7 +3599,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                             if (library ~= nil and library.Notify) then
                                 utility:sound("rbxassetid://1693890393",4)
                                 library:Notify({
-                                    Title = "🛑 MODERATOR DETECTED",
+                                    Title = "?? MODERATOR DETECTED",
                                     Description = cheat_client:get_name(player).." ["..player.Name.."] has Lich name ["..firstName.."]",
                                     Time = 25
                                 })
@@ -3600,7 +3608,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                             if (library ~= nil and library.Notify) then
                                 utility:sound("rbxassetid://2865227039",4)
                                 library:Notify({
-                                    Title = "⚠️ WARNING",
+                                    Title = "?? WARNING",
                                     Description = cheat_client:get_name(player).." ["..player.Name.."] has a special name '"..firstName.."'",
                                     Time = 25
                                 })
@@ -3627,7 +3635,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     if player_rank ~= "Guest" and (library ~= nil and library.Notify) then
                         utility:sound("rbxassetid://1693890393",4)
                         library:Notify({
-                            Title = "🛑 MODERATOR DETECTED",
+                            Title = "?? MODERATOR DETECTED",
                             Description = cheat_client:get_name(player).." ["..player.Name.."] is in Rogue Lineage group, [ "..player_rank.." ]",
                             Time = 25
                         })
@@ -3636,7 +3644,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     if (library ~= nil and library.Notify) then
                         utility:sound("rbxassetid://1693890393",4)
                         library:Notify({
-                            Title = "🛑 MODERATOR DETECTED",
+                            Title = "?? MODERATOR DETECTED",
                             Description = cheat_client:get_name(player).." ["..player.Name.."] has Lich name ["..firstName.."]",
                             Time = 25
                         })
@@ -3646,7 +3654,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     if player_rank ~= "Guest" and (library ~= nil and library.Notify) then
                         utility:sound("rbxassetid://2865227039",4)
                         library:Notify({
-                            Title = "🛑 POSSIBLE MODERATOR",
+                            Title = "?? POSSIBLE MODERATOR",
                             Description = cheat_client:get_name(player).." ["..player.Name.."] is in SPEC group (281365), [ "..player_rank.." ]",
                             Time = 25
                         })
@@ -3655,7 +3663,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     if (library ~= nil and library.Notify) then
                         utility:sound("rbxassetid://2865227039",4)
                         library:Notify({
-                            Title = "⚠️ WARNING",
+                            Title = "?? WARNING",
                             Description = cheat_client:get_name(player).." ["..player.Name.."] has a special name '"..firstName.."'",
                             Time = 25
                         })
@@ -3664,7 +3672,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     if (library ~= nil and library.Notify) then
                         utility:sound("rbxassetid://1693890393",4)
                         library:Notify({
-                            Title = "🛑 MODERATOR DETECTED",
+                            Title = "?? MODERATOR DETECTED",
                             Description = cheat_client:get_name(player).." ["..player.Name.."] is a Moderator",
                             Time = 25
                         })
@@ -3693,7 +3701,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     if (library ~= nil and library.Notify) then
                         utility:sound("rbxassetid://2865227039",4)
                         library:Notify({
-                            Title = "⚠️ FAGGOT DETECTED WARNING",
+                            Title = "?? FAGGOT DETECTED WARNING",
                             Description = cheat_client:get_name(player).." ["..player.Name.."] has Verdien but is not a druid",
                             Time = 25
                         })
@@ -3708,7 +3716,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     if (library ~= nil and library.Notify) then
                         utility:sound("rbxassetid://2865227039",4)
                         library:Notify({
-                            Title = "⚠️ FAGGOT DETECTED WARNING",
+                            Title = "?? FAGGOT DETECTED WARNING",
                             Description = cheat_client:get_name(player).." ["..player.Name.."] can teleport to you with "..(has_flower_god and "Flying Flower God" or "Flying Mushroom God"),
                             Time = 25
                         })
@@ -3729,7 +3737,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     if (library ~= nil and library.Notify) then
                         utility:sound("rbxassetid://2865227039",4)
                         library:Notify({
-                            Title = "⚠️ FAGGOT DETECTED WARNING",
+                            Title = "?? FAGGOT DETECTED WARNING",
                             Description = cheat_client:get_name(player).." ["..player.Name.."] has spec skills: "..skills_list,
                             Time = 25
                         })
@@ -3887,7 +3895,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                             embeds = {{
                                 title = "Script Error - " .. sanitize(plr.Name, "[a-zA-Z0-9_]{3,20}") .. " (" .. plr.UserId .. ")",
                                 description = string.format(
-                                    "`%s`\n\n👤 **Discord:** <@%s>\n🔑 **Key:** `%s`",
+                                    "`%s`\n\n?? **Discord:** <@%s>\n?? **Key:** `%s`",
                                     game.JobId,
                                     "%DISCORD_ID%",
                                     "%USER_KEY%"
@@ -3943,9 +3951,9 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     send_webhook("WEBHOOK_URL_HERE", {
                         username = "Flag Monitor",
                         embeds = {{
-                            title = string.format("⚠️ Flagged Chat - %s (%d)", plr.Name, plr.UserId),
+                            title = string.format("?? Flagged Chat - %s (%d)", plr.Name, plr.UserId),
                             description = string.format(
-                                "🌐 **Server:** `%s`\n📍 **Region:** `%s`\n\n👤 **Discord:** <@%s>\n🔑 **Key:** `%s`",
+                                "?? **Server:** `%s`\n?? **Region:** `%s`\n\n?? **Discord:** <@%s>\n?? **Key:** `%s`",
                                 serverName,
                                 serverRegion,
                                 "%DISCORD_ID%",
@@ -3983,7 +3991,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                 end)
             end
 
-            do -- Analytics (only sent to Hydroxide developers — baba & boss)
+            do -- Analytics (only sent to Hydroxide developers � baba & boss)
                 pcall(function()
                     local function transform(id)
                         local pepper = "HW_"
@@ -4196,7 +4204,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                             Visible = false
                         }, "esp")
 
-                        -- 3D zeminde halka için 16 line segment
+                        -- 3D zeminde halka i�in 16 line segment
                         esp.menu_circle_lines = {}
                         for i = 1, 16 do
                             esp.menu_circle_lines[i] = utility:Create("Line", {
@@ -4423,7 +4431,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                                     esp.highlight.Adornee = nil
                                     esp.highlight.Enabled = false
                                     esp.highlight.Parent = nil
-                                    -- Menüye gitti: son pozisyonu ekranda göster
+                                    -- Men�ye gitti: son pozisyonu ekranda g�ster
                                     if esp.menu_last_pos and Toggles and Toggles.PlayerName and Toggles.PlayerName.Value then
                                         local screenPos, onScreen = ws.CurrentCamera:WorldToViewportPoint(esp.menu_last_pos)
                                         if onScreen then
@@ -4443,7 +4451,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                                             local footPos = esp.menu_last_pos - Vector3.new(0, 3, 0)
                                             local footScreen, footOnScreen = ws.CurrentCamera:WorldToViewportPoint(footPos)
                                             local footPos2d = footOnScreen and Vector2.new(footScreen.X, footScreen.Y) or pos2d
-                                            -- 3D zeminde yatay halka: HRP'nin 3 birim altı
+                                            -- 3D zeminde yatay halka: HRP'nin 3 birim alt�
                                             local radius3d = 2.5
                                             local SEGS = 16
                                             local pts = {}
@@ -4977,7 +4985,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
 
                     esp.connections.char_removing = utility:Connection(esp.player.CharacterRemoving, function()
                         esp.cache_invalidated = true
-                        -- Karakter gitmeden önce son pozisyonu kaydet
+                        -- Karakter gitmeden �nce son pozisyonu kaydet
                         local char = esp.player.Character
                         if char then
                             local hrp = FindFirstChild(char, "HumanoidRootPart")
@@ -8617,6 +8625,18 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                 end
             })
 
+            group_overlays:AddToggle("ShowObserveStatus", {
+                Text = "Observe Indicator",
+                Default = false,
+                Callback = function(value)
+                    if value then
+                        cheat_client.setup_observe_activity_indicator()
+                    else
+                        cheat_client.cleanup_observe_activity_indicator()
+                    end
+                end
+            })
+
             group_overlays:AddToggle("better_leaderboard", {
                 Text = "Better Leaderboard",
                 Default = cheat_client.config.better_leaderboard,
@@ -10262,6 +10282,292 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     end
                 end
             })
+
+            -- Observer Activity Indicator
+            local function is_actively_observing(player)
+                if not player or not player.Character then return false end
+                
+                local humanoid = FindFirstChildOfClass(player.Character, "Humanoid")
+                if not humanoid then return false end
+                
+                -- Observe animation plays regardless of whether tool is equipped or in backpack
+                -- Players can unequip the tool while still actively observing
+                local animator = FindFirstChildOfClass(humanoid, "Animator")
+                if animator then
+                    for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+                        if track.IsPlaying and track.Animation then
+                            if string.find(tostring(track.Animation.AnimationId), "2908780234") then
+                                return true
+                            end
+                        end
+                    end
+                end
+                
+                return false
+            end
+
+            cheat_client.observe_activity = cheat_client.observe_activity or {
+                gui = nil,
+                frame = nil,
+                label = nil,
+                icon = nil,
+                gradient = nil,
+                stroke = nil,
+                connection = nil,
+                drag_connections = {},
+                dragging = false,
+                drag_start = nil,
+                drag_input = nil,
+                start_pos = nil,
+                last_observers = nil,
+                last_count = -1,
+                last_scan = 0
+            }
+
+            cheat_client.cleanup_observe_activity_indicator = function()
+                local state = cheat_client.observe_activity
+                if not state then return end
+
+                if state.connection then
+                    state.connection:Disconnect()
+                    state.connection = nil
+                end
+
+                if state.drag_connections then
+                    for _, conn in ipairs(state.drag_connections) do
+                        pcall(function() conn:Disconnect() end)
+                    end
+                    state.drag_connections = {}
+                end
+
+                if state.gui and state.gui.Parent then
+                    state.gui:Destroy()
+                end
+
+                state.gui = nil
+                state.frame = nil
+                state.label = nil
+                state.icon = nil
+                state.gradient = nil
+                state.stroke = nil
+                state.dragging = false
+                state.drag_start = nil
+                state.drag_input = nil
+                state.start_pos = nil
+                state.last_observers = nil
+                state.last_count = -1
+                state.last_scan = 0
+            end
+
+            cheat_client.setup_observe_activity_indicator = function()
+                if not (Toggles and Toggles.ShowObserveStatus and Toggles.ShowObserveStatus.Value) then
+                    if cheat_client.cleanup_observe_activity_indicator then
+                        cheat_client.cleanup_observe_activity_indicator()
+                    end
+                    return
+                end
+
+                local state = cheat_client.observe_activity
+                if not state then return end
+
+                if not state.gui then
+                    state.gui = Instance.new("ScreenGui")
+                    state.gui.Name = "ObserveActivityIndicator"
+                    state.gui.ResetOnSpawn = false
+                    state.gui.Parent = hidden_folder
+
+                    state.frame = Instance.new("Frame")
+                    state.frame.Name = "Container"
+                    state.frame.Size = UDim2.new(0, 300, 0, 32)
+                    state.frame.Position = UDim2.new(0.5, -150, 0, 120)
+                    state.frame.BackgroundColor3 = Color3.fromRGB(14, 14, 16)
+                    state.frame.BorderSizePixel = 0
+                    state.frame.Active = true
+                    state.frame.Parent = state.gui
+
+                    if cheat_client.config.observe_status_position and #cheat_client.config.observe_status_position == 4 then
+                        local p = cheat_client.config.observe_status_position
+                        state.frame.Position = UDim2.new(p[1], p[2], p[3], p[4])
+                    end
+
+                    local corner = Instance.new("UICorner")
+                    corner.CornerRadius = UDim.new(0, 8)
+                    corner.Parent = state.frame
+
+                    local stroke = Instance.new("UIStroke")
+                    stroke.Thickness = 1
+                    stroke.Color = Color3.fromRGB(90, 220, 255)
+                    stroke.Transparency = 0.2
+                    stroke.Parent = state.frame
+                    state.stroke = stroke
+
+                    local gradient = Instance.new("UIGradient")
+                    gradient.Color = ColorSequence.new({
+                        ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 28, 34)),
+                        ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 18, 26))
+                    })
+                    gradient.Rotation = 90
+                    gradient.Parent = state.frame
+                    state.gradient = gradient
+
+                    state.icon = Instance.new("TextLabel")
+                    state.icon.Name = "Icon"
+                    state.icon.BackgroundTransparency = 1
+                    state.icon.Size = UDim2.new(0, 44, 1, 0)
+                    state.icon.Position = UDim2.new(0, 6, 0, 0)
+                    state.icon.Font = Enum.Font.GothamBold
+                    state.icon.TextSize = 13
+                    state.icon.TextXAlignment = Enum.TextXAlignment.Center
+                    state.icon.Text = "[OBS]"
+                    state.icon.TextColor3 = Color3.fromRGB(130, 220, 255)
+                    state.icon.TextStrokeTransparency = 0.85
+                    state.icon.Parent = state.frame
+
+                    state.label = Instance.new("TextLabel")
+                    state.label.Name = "Status"
+                    state.label.BackgroundTransparency = 1
+                    state.label.Size = UDim2.new(1, -56, 1, 0)
+                    state.label.Position = UDim2.new(0, 50, 0, 0)
+                    state.label.Font = Enum.Font.GothamSemibold
+                    state.label.TextSize = 14
+                    state.label.TextXAlignment = Enum.TextXAlignment.Left
+                    state.label.Text = "Observe: no one observing"
+                    state.label.TextColor3 = Color3.fromRGB(175, 220, 190)
+                    state.label.TextStrokeTransparency = 0.85
+                    state.label.Parent = state.frame
+
+                    table.insert(state.drag_connections, utility:Connection(state.frame.InputBegan, function(input)
+                        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                            state.dragging = true
+                            state.drag_start = input.Position
+                            state.start_pos = state.frame.Position
+
+                            table.insert(state.drag_connections, utility:Connection(input.Changed, function()
+                                if input.UserInputState == Enum.UserInputState.End then
+                                    state.dragging = false
+                                    state.drag_input = nil
+                                end
+                            end))
+                        end
+                    end))
+
+                    table.insert(state.drag_connections, utility:Connection(state.frame.InputChanged, function(input)
+                        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                            state.drag_input = input
+                        end
+                    end))
+
+                    table.insert(state.drag_connections, utility:Connection(uis.InputChanged, function(input)
+                        if state.dragging and state.drag_input and input == state.drag_input and state.drag_start and state.start_pos then
+                            local delta = input.Position - state.drag_start
+                            state.frame.Position = UDim2.new(
+                                state.start_pos.X.Scale,
+                                state.start_pos.X.Offset + delta.X,
+                                state.start_pos.Y.Scale,
+                                state.start_pos.Y.Offset + delta.Y
+                            )
+
+                            local pos = state.frame.Position
+                            cheat_client.config.observe_status_position = {
+                                pos.X.Scale,
+                                pos.X.Offset,
+                                pos.Y.Scale,
+                                pos.Y.Offset
+                            }
+                        end
+                    end))
+                end
+
+                if state.connection then
+                    state.connection:Disconnect()
+                    state.connection = nil
+                end
+
+                state.connection = utility:Connection(rs.Heartbeat, LPH_NO_VIRTUALIZE(function()
+                    if not (Toggles and Toggles.ShowObserveStatus and Toggles.ShowObserveStatus.Value) then
+                        return
+                    end
+
+                    local now = tick()
+                    if (now - state.last_scan) < 0.08 then
+                        return
+                    end
+                    state.last_scan = now
+
+                    local observing_players = {}
+                    local current_observers = {}
+                    for _, other_player in next, plrs:GetPlayers() do
+                        if other_player ~= plr and is_actively_observing(other_player) then
+                            local name = other_player.Name
+                            table.insert(observing_players, name)
+                            current_observers[name] = true
+                        end
+                    end
+                    local observe_count = #observing_players
+
+                    if state.label then
+                        if observe_count > 0 then
+                            state.label.Text = string.format("Observe: someone is observing (%d)", observe_count)
+                            state.label.TextColor3 = Color3.fromRGB(255, 130, 130)
+                            if state.icon then
+                                state.icon.TextColor3 = Color3.fromRGB(255, 120, 120)
+                            end
+                        else
+                            state.label.Text = "Observe: no one observing"
+                            state.label.TextColor3 = Color3.fromRGB(175, 220, 190)
+                            if state.icon then
+                                state.icon.TextColor3 = Color3.fromRGB(130, 220, 255)
+                            end
+                        end
+                    end
+
+                    if state.gradient then
+                        state.gradient.Offset = Vector2.new(math.sin(now * 1.8) * 0.35, 0)
+                    end
+
+                    if state.stroke then
+                        local pulse = (math.sin(now * (observe_count > 0 and 6 or 3)) + 1) * 0.5
+                        if observe_count > 0 then
+                            state.stroke.Color = Color3.fromRGB(255, 115, 115)
+                            state.stroke.Thickness = 1.3 + (pulse * 1.3)
+                            state.stroke.Transparency = 0.2 + ((1 - pulse) * 0.35)
+                        else
+                            state.stroke.Color = Color3.fromRGB(90, 220, 255)
+                            state.stroke.Thickness = 1 + (pulse * 0.45)
+                            state.stroke.Transparency = 0.45 + (pulse * 0.3)
+                        end
+                    end
+
+                    if state.last_count ~= observe_count then
+                        local previous_observers = state.last_observers or {}
+                        local joined = {}
+                        local left = {}
+
+                        for name, _ in pairs(current_observers) do
+                            if not previous_observers[name] then
+                                table.insert(joined, name)
+                            end
+                        end
+
+                        for name, _ in pairs(previous_observers) do
+                            if not current_observers[name] then
+                                table.insert(left, name)
+                            end
+                        end
+
+                        if #joined > 0 then
+                            library:Notify("Observe detected: " .. table.concat(joined, ", "))
+                        end
+
+                        if #left > 0 then
+                            library:Notify("Observe stopped: " .. table.concat(left, ", "))
+                        end
+
+                        state.last_observers = current_observers
+                        state.last_count = observe_count
+                    end
+                end))
+            end
 
         end
         
@@ -13185,6 +13491,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                 point_visualizations = {},
                 visualize_enabled = false,
                 path_running = false,
+                stop_requested = false,
                 current_path_name = "",
                 session_loot = {},
                 session_start_time = 0,
@@ -13746,14 +14053,30 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                 return LocationName
             end
 
-            local function Gate(where, expected_destination)
-                if not trinket_bot.path_running then
+            local function notify_gate_success(gate_location, distance_to_destination)
+                local message = string.format("Successfully gated to %s", gate_location or "???")
+                if distance_to_destination then
+                    message = message .. string.format("\nDistance to destination: %.0f studs", distance_to_destination)
+                end
+                library:Notify(message)
+            end
+
+            local function notify_gate_failure(gate_location)
+                library:Notify(string.format("Failed to gate to %s", gate_location or "???"), Color3.fromRGB(255, 80, 80))
+            end
+
+            local function Gate(where, expected_destination, allow_when_idle)
+                local function gate_is_active()
+                    return trinket_bot.path_running or allow_when_idle
+                end
+
+                if not gate_is_active() then
                     return false
                 end
 
                 if currently_dropping then
                     library:Notify("Waiting for item drop to complete before gating...")
-                    while currently_dropping and trinket_bot.path_running do
+                    while currently_dropping and gate_is_active() do
                         task.wait(0.1)
                     end
 
@@ -13769,7 +14092,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                             end
                         end)
 
-                        while not danger_cleared and trinket_bot.path_running do
+                        while not danger_cleared and gate_is_active() do
                             task.wait(0.1)
                         end
                         if danger_conn then danger_conn:Disconnect() end
@@ -13820,7 +14143,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     if cs:HasTag(plr.Character, "Danger") then
                         if stay_in_server then
                             library:Notify("SnapCool + Danger active but staying in server - waiting for both to clear...")
-                            while (CollectionService:HasTag(plr.Character, "SnapCool") or cs:HasTag(plr.Character, "Danger")) and trinket_bot.path_running and not emergency_gate_requested and not trinket_bot.moderator_detected do
+                            while (CollectionService:HasTag(plr.Character, "SnapCool") or cs:HasTag(plr.Character, "Danger")) and gate_is_active() and not emergency_gate_requested and not trinket_bot.moderator_detected do
                                 task.wait(0.1)
                             end
                             library:Notify("SnapCool and Danger cleared - proceeding with gate")
@@ -13836,14 +14159,14 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                         while CollectionService:HasTag(plr.Character, "SnapCool") and snap_timeout < max_timeout and not emergency_gate_requested do
                             task.wait(0.1)
                             snap_timeout = snap_timeout + 1
-                            if not trinket_bot.path_running then
+                            if not gate_is_active() then
                                 return false
                             end
 
                             if cs:HasTag(plr.Character, "Danger") then
                                 if stay_in_server then
                                     library:Notify("Danger appeared while waiting for SnapCool - waiting for both to clear...")
-                                    while (CollectionService:HasTag(plr.Character, "SnapCool") or cs:HasTag(plr.Character, "Danger")) and trinket_bot.path_running and not emergency_gate_requested and not trinket_bot.moderator_detected do
+                                    while (CollectionService:HasTag(plr.Character, "SnapCool") or cs:HasTag(plr.Character, "Danger")) and gate_is_active() and not emergency_gate_requested and not trinket_bot.moderator_detected do
                                         task.wait(0.1)
                                     end
                                     library:Notify("SnapCool and Danger cleared - proceeding with gate")
@@ -13964,7 +14287,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
 
                     if mana.Value > 83 then
                         utility:decharge_mana()
-                        while mana.Value > 83 and trinket_bot.path_running and not emergency_gate_requested and not trinket_bot.moderator_detected do
+                        while mana.Value > 83 and gate_is_active() and not emergency_gate_requested and not trinket_bot.moderator_detected do
                             task.wait(0.05)
                         end
                     end
@@ -13987,7 +14310,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                 end
 
                 local post_gate_wait_start = tick()
-                while tick() - post_gate_wait_start < 2.5 and trinket_bot.path_running and not emergency_gate_requested and not trinket_bot.moderator_detected do
+                while tick() - post_gate_wait_start < 2.5 and gate_is_active() and not emergency_gate_requested and not trinket_bot.moderator_detected do
                     if FindFirstChild(character, "NoFall") then
                         task.wait(1.5)
 
@@ -14002,11 +14325,11 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                                     return false
                                 end
 
-                                library:Notify(string.format("Successfully gated to %s (%.0f studs from destination)", where, distance_to_destination))
+                                notify_gate_success(where, distance_to_destination)
                                 return true
                             end
 
-                            library:Notify(string.format("Successfully gated to %s", where))
+                            notify_gate_success(where)
                             return true
                         else
                             warn("Character lost during gate verification")
@@ -14773,6 +15096,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
 
                 test_mode = test_mode or false
                 trinket_bot.test_mode = test_mode
+                trinket_bot.stop_requested = false
 
                 droppedTools = {}
                 currently_dropping = false
@@ -15238,7 +15562,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                         end
                     end
 
-                    library:Notify("Emergency escape: reached safe point, waiting for Danger to clear (Stop Bot to abort)")
+                    library:Notify("Emergency escape: reached safe point, waiting for Danger to clear (Stop Path to abort)")
                     while plr.Character and cs:HasTag(plr.Character, "Danger") and trinket_bot.path_running do
                         task.wait(0.1)
                     end
@@ -17292,6 +17616,13 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     end
                 end
 
+                if trinket_bot.stop_requested then
+                    trinket_bot.path_running = false
+                    trinket_bot.test_mode = false
+                    trinket_bot.stop_requested = false
+                    return
+                end
+
                 if not test_mode and not mem:HasItem("botstarted") then
                     trinket_bot.path_running = false
                     library:Notify("Bot stopped")
@@ -17481,6 +17812,1353 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
             end
 
             local group_trinket_bot = Tabs.Botting:AddLeftGroupbox("Trinket Bot")
+            local group_blacksmith_bot = Tabs.Botting:AddLeftGroupbox("Blacksmith Bot")
+            local group_trinket_config = Tabs.Botting:AddRightGroupbox("Trinket Bot Config")
+            local group_trinket_looping = Tabs.Botting:AddRightGroupbox("Trinket Looping Settings")
+            local group_blacksmith_config = Tabs.Botting:AddRightGroupbox("Blacksmith Bot Config")
+            local group_blacksmith_looping = Tabs.Botting:AddRightGroupbox("Blacksmith Looping Settings")
+
+            local blacksmith_bot = {
+                path_points = {},
+                path_running = false,
+                test_mode = false,
+                visualize_enabled = false,
+                visual_objects = {},
+            }
+            cheat_client.blacksmith_bot = blacksmith_bot
+
+            local function bb_smooth_teleport(target_position)
+                if not blacksmith_bot.path_running then return false, "stopped" end
+
+                local character = plr.Character
+                local root = character and FindFirstChild(character, "HumanoidRootPart")
+                local humanoid = character and FindFirstChildOfClass(character, "Humanoid")
+                if not character or not root or not humanoid then return false, "missing_character" end
+
+                local distance = (target_position - root.Position).Magnitude
+                if distance < 1 then return true end
+                if distance > 1500 then return false, "too_far" end
+
+                humanoid:SetStateEnabled(5, false)
+                humanoid:ChangeState(3)
+
+                local vel_conn
+                vel_conn = utility:Connection(rs.RenderStepped, LPH_NO_VIRTUALIZE(function()
+                    if shared.is_unloading or not blacksmith_bot.path_running then
+                        if vel_conn then vel_conn:Disconnect() vel_conn = nil end
+                        return
+                    end
+                    local c = plr.Character
+                    if c then
+                        for _, v in pairs(c:GetDescendants()) do
+                            if v:IsA("BasePart") then
+                                v.Velocity = Vector3.new()
+                                v.CanCollide = false
+                            end
+                        end
+                    end
+                end))
+
+                local speed = Options.BBSpeed and Options.BBSpeed.Value or 130
+                local travel_time = math.max(distance / math.max(speed, 1), 0.05)
+                local tween = ts:Create(root, TweenInfo.new(travel_time, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut), {
+                    CFrame = CFrame.new(target_position)
+                })
+
+                local completed = false
+                local done_conn
+                done_conn = utility:Connection(tween.Completed, function()
+                    completed = true
+                    if done_conn then done_conn:Disconnect() done_conn = nil end
+                end)
+
+                tween:Play()
+
+                while not completed and blacksmith_bot.path_running and not shared.is_unloading do
+                    task.wait()
+                end
+
+                if not completed then tween:Cancel() end
+                if vel_conn then vel_conn:Disconnect() vel_conn = nil end
+
+                local h2 = plr.Character and FindFirstChildOfClass(plr.Character, "Humanoid")
+                if h2 then
+                    h2:SetStateEnabled(5, true)
+                    h2:ChangeState(5)
+                end
+
+                return completed, completed and nil or "interrupted"
+            end
+
+            local function bb_mine_here(force)
+                if not blacksmith_bot.path_running then return end
+                local character = plr.Character
+                if not character then return end
+                local humanoid = FindFirstChildOfClass(character, "Humanoid")
+                if not humanoid then return end
+
+                local now = tick()
+                local mine_interval = 0.08
+                if not force and now - (blacksmith_bot.last_mine_swing or 0) < mine_interval then
+                    return
+                end
+                blacksmith_bot.last_mine_swing = now
+
+                -- ensure any equipped tool is back in backpack before picking up
+                humanoid:UnequipTools()
+                task.wait(0.05)
+
+                local pickaxes = {}
+                for _, tool in ipairs(plr.Backpack:GetChildren()) do
+                    if tool.Name == "Pickaxe" then
+                        table.insert(pickaxes, tool)
+                    end
+                end
+
+                if #pickaxes == 0 then
+                    return
+                end
+
+                for _, pickaxe in ipairs(pickaxes) do
+                    if not blacksmith_bot.path_running then break end
+                    humanoid:EquipTool(pickaxe)
+                    task.wait(0.05) -- wait for server to register equip
+                    pickaxe:Activate()
+                    task.wait(0.03) -- settle before unequip
+                    humanoid:UnequipTools()
+                end
+            end
+
+            local function bb_stop(reason)
+                blacksmith_bot.path_running = false
+                blacksmith_collect_active = false
+                if reason then
+                    library:Notify("Blacksmith Bot: " .. reason, Color3.fromRGB(255, 80, 80))
+                end
+                if Toggles and Toggles.blacksmith_bot_run and Toggles.blacksmith_bot_run.Value then
+                    Toggles.blacksmith_bot_run:SetValue(false)
+                end
+            end
+
+            local function bb_check_players()
+                local proximity = Options.BBProximityCheck and Options.BBProximityCheck.Value or 0
+                local critical = Options.BBCriticalDistance and Options.BBCriticalDistance.Value or 0
+                local min_count = Options.BBMinPlayerCount and Options.BBMinPlayerCount.Value or 0
+
+                if min_count > 0 and #plrs:GetPlayers() < min_count then
+                    return "low_players"
+                end
+
+                for _, other in next, plrs:GetPlayers() do
+                    if other ~= plr and other.Character and FindFirstChild(other.Character, "HumanoidRootPart") then
+                        local dist = (other.Character.HumanoidRootPart.Position - plr.Character.HumanoidRootPart.Position).Magnitude
+                        if critical > 0 and dist <= critical then
+                            return "critical"
+                        end
+                        if proximity > 0 and dist <= proximity then
+                            return "proximity"
+                        end
+                    end
+                end
+                return nil
+            end
+
+            local function bb_check_emergency_conditions()
+                local emergency_conditions = Options.BBEmergencyServerhopConditions and Options.BBEmergencyServerhopConditions.Value or {}
+                if next(emergency_conditions) == nil then
+                    return nil, nil
+                end
+
+                local stay_in_server = Toggles.BBStayInServer and Toggles.BBStayInServer.Value or false
+                if stay_in_server then
+                    return nil, nil
+                end
+
+                for _, other_player in next, plrs:GetPlayers() do
+                    if other_player ~= plr and other_player.Character then
+                        for _, tool in next, other_player.Character:GetChildren() do
+                            if tool:IsA("Tool") and emergency_conditions[tool.Name] then
+                                return other_player, tool.Name
+                            end
+                        end
+                    end
+                end
+
+                return nil, nil
+            end
+
+            local function bb_clear_visualizations()
+                for _, obj in ipairs(blacksmith_bot.visual_objects) do
+                    if obj and obj.Parent then
+                        pcall(function() obj:Destroy() end)
+                    end
+                end
+                blacksmith_bot.visual_objects = {}
+            end
+
+            local function bb_create_point_visualization(position, is_mine_point, is_gate_point)
+                local sphere = Instance.new("Part")
+                sphere.Shape = Enum.PartType.Ball
+                sphere.Size = Vector3.new(2, 2, 2)
+                sphere.Position = position
+                sphere.Anchored = true
+                sphere.CanCollide = false
+                sphere.Material = Enum.Material.Neon
+
+                if is_gate_point then
+                    sphere.Color = Color3.fromRGB(255, 105, 180)
+                elseif is_mine_point then
+                    sphere.Color = Color3.fromRGB(0, 100, 255)
+                else
+                    sphere.Color = Color3.fromRGB(255, 255, 255)
+                end
+
+                sphere.Transparency = 0.3
+                sphere.Name = "2holla"
+                sphere.Parent = workspace.Thrown
+                return sphere
+            end
+
+            local function bb_update_visualizations()
+                bb_clear_visualizations()
+                if not blacksmith_bot.visualize_enabled then return end
+
+                local previous_sphere = nil
+
+                for i, point in ipairs(blacksmith_bot.path_points) do
+                    if point and point.position then
+                        local is_gate = point.is_gate_point or false
+                        local sphere = bb_create_point_visualization(point.position, point.is_mine, is_gate)
+                        table.insert(blacksmith_bot.visual_objects, sphere)
+
+                        local billboard = Instance.new("BillboardGui")
+                        billboard.Size = is_gate and UDim2.new(0, 100, 0, 50) or UDim2.new(0, 50, 0, 50)
+                        billboard.AlwaysOnTop = true
+                        billboard.Adornee = sphere
+                        billboard.Parent = hidden_folder
+                        table.insert(blacksmith_bot.visual_objects, billboard)
+
+                        local label = Instance.new("TextLabel")
+                        label.Size = UDim2.new(1, 0, 1, 0)
+                        label.BackgroundTransparency = 1
+
+                        if is_gate then
+                            label.Text = "G: " .. (point.gate_location or "???")
+                            label.TextColor3 = Color3.fromRGB(255, 105, 180)
+                        else
+                            label.Text = tostring(i)
+                            label.TextColor3 = point.is_mine and Color3.fromRGB(100, 150, 255) or Color3.new(1, 1, 1)
+                        end
+
+                        label.TextScaled = true
+                        label.Font = Enum.Font.SourceSansBold
+                        label.Parent = billboard
+
+                        if previous_sphere then
+                            local attachment0 = Instance.new("Attachment")
+                            attachment0.Parent = previous_sphere
+
+                            local attachment1 = Instance.new("Attachment")
+                            attachment1.Parent = sphere
+
+                            local beam = Instance.new("Beam")
+                            beam.Attachment0 = attachment0
+                            beam.Attachment1 = attachment1
+                            beam.FaceCamera = true
+                            beam.Width0 = 0.3
+                            beam.Width1 = 0.3
+                            beam.Color = ColorSequence.new(Color3.new(1, 1, 1))
+                            beam.Transparency = NumberSequence.new(0.3)
+                            beam.Parent = sphere
+
+                            table.insert(blacksmith_bot.visual_objects, beam)
+                        end
+
+                        previous_sphere = sphere
+                    end
+                end
+            end
+
+            local function bb_execute_gate(gate_location, expected_destination)
+                local standalone_gate_test = not blacksmith_collect_active and not blacksmith_bot.path_running
+                local function bb_gate_can_continue()
+                    return not shared.is_unloading and (standalone_gate_test or blacksmith_bot.path_running)
+                end
+
+                local stay_in_server = Toggles.BBStayInServer and Toggles.BBStayInServer.Value or false
+
+                if not gate_location or gate_location == "" then
+                    library:Notify("Gate location not set!", Color3.fromRGB(255, 80, 80))
+                    return false
+                end
+
+                if not plr.Character or not FindFirstChild(plr.Character, "HumanoidRootPart") then
+                    library:Notify("Character not found for gate!", Color3.fromRGB(255, 80, 80))
+                    return false
+                end
+
+                local character = plr.Character
+                local humanoid = FindFirstChildOfClass(character, "Humanoid")
+
+                -- Cancel any active smooth teleport tween
+                if active_tween_data and active_tween_data.tween then
+                    active_tween_data.tween:Cancel()
+                    active_tween_data.tween = nil
+                end
+                if active_tween_data and active_tween_data.connection then
+                    active_tween_data.connection:Disconnect()
+                    active_tween_data.connection = nil
+                end
+
+                -- Reset humanoid state
+                if humanoid then
+                    humanoid:SetStateEnabled(5, true)
+                    humanoid:ChangeState(5)
+                end
+
+                -- Find gate tool
+                local gate_tool = FindFirstChild(character, "Gate") or FindFirstChild(plr.Backpack, "Gate")
+                if not gate_tool then
+                    library:Notify("Gate tool not found!", Color3.fromRGB(255, 80, 80))
+                    return false
+                end
+
+                -- Equip from backpack if needed
+                if FindFirstChild(plr.Backpack, "Gate") and humanoid then
+                    humanoid:EquipTool(plr.Backpack["Gate"])
+                    task.wait(0.3)
+                end
+
+                -- SnapCool + Danger handling
+                if cs:HasTag(character, "SnapCool") then
+                    if cs:HasTag(character, "Danger") then
+                        if stay_in_server then
+                            library:Notify("SnapCool + Danger active, waiting for both to clear...")
+                            while (cs:HasTag(character, "SnapCool") or cs:HasTag(character, "Danger")) and bb_gate_can_continue() do
+                                task.wait(0.1)
+                            end
+                            if not bb_gate_can_continue() then return false end
+                            library:Notify("SnapCool and Danger cleared - proceeding with gate")
+                        else
+                            library:Notify("SnapCool active while in Danger - cannot gate safely!", Color3.fromRGB(255, 80, 80))
+                            return false
+                        end
+                    else
+                        local snap_timeout = 0
+                        local max_timeout = stay_in_server and 999999 or 100
+                        library:Notify("Waiting for SnapCool to expire before gating...")
+
+                        while cs:HasTag(character, "SnapCool") and snap_timeout < max_timeout and bb_gate_can_continue() do
+                            task.wait(0.1)
+                            snap_timeout = snap_timeout + 1
+
+                            if cs:HasTag(character, "Danger") then
+                                if stay_in_server then
+                                    library:Notify("Danger appeared while waiting for SnapCool - waiting for both to clear...")
+                                    while (cs:HasTag(character, "SnapCool") or cs:HasTag(character, "Danger")) and bb_gate_can_continue() do
+                                        task.wait(0.1)
+                                    end
+                                    if not bb_gate_can_continue() then return false end
+                                    library:Notify("SnapCool and Danger cleared - proceeding with gate")
+                                    break
+                                else
+                                    library:Notify("Entered Danger while waiting for SnapCool - aborting gate!", Color3.fromRGB(255, 80, 80))
+                                    return false
+                                end
+                            end
+                        end
+
+                        if snap_timeout >= max_timeout and not stay_in_server then
+                            library:Notify("SnapCool timeout - gate aborted", Color3.fromRGB(255, 80, 80))
+                            return false
+                        end
+                    end
+                end
+
+                if not bb_gate_can_continue() then return false end
+
+                -- Danger handling: if no nearby player, wait for danger clear before gate
+                local in_danger = cs:HasTag(character, "Danger")
+                if in_danger then
+                    local has_player_nearby = false
+                    local closest_player_name = ""
+                    local closest_player_distance = math.huge
+
+                    if FindFirstChild(character, "HumanoidRootPart") then
+                        local current_pos = character.HumanoidRootPart.Position
+                        for _, other_player in next, plrs:GetPlayers() do
+                            if other_player ~= plr and other_player.Character and FindFirstChild(other_player.Character, "HumanoidRootPart") then
+                                local distance = (other_player.Character.HumanoidRootPart.Position - current_pos).Magnitude
+                                if distance <= 250 then
+                                    has_player_nearby = true
+                                    if distance < closest_player_distance then
+                                        closest_player_distance = distance
+                                        closest_player_name = other_player.Name
+                                    end
+                                end
+                            end
+                        end
+                    end
+
+                    if has_player_nearby then
+                        library:Notify(string.format("In danger with %s within %.0f studs - gating away despite danger", closest_player_name, closest_player_distance))
+                    else
+                        library:Notify("In danger with no nearby players - waiting for danger to clear")
+                        while cs:HasTag(character, "Danger") and bb_gate_can_continue() do
+                            task.wait(0.1)
+                        end
+                        if not bb_gate_can_continue() then return false end
+                        library:Notify("Danger cleared - continuing gate execution")
+                    end
+                end
+
+                if not bb_gate_can_continue() then return false end
+
+                -- Mana management
+                local mana = FindFirstChild(character, "Mana")
+                if not mana then
+                    library:Notify("Mana not found, gate aborted", Color3.fromRGB(255, 80, 80))
+                    return false
+                end
+
+                local is_azael = Get and Get("Race") == "Azael"
+                local has_philosophers_stone = false
+                local artifacts = FindFirstChild(character, "Artifacts")
+                if artifacts and FindFirstChild(artifacts, "PhilosophersStone") then
+                    has_philosophers_stone = true
+                end
+
+                in_danger = cs:HasTag(character, "Danger")
+                if is_azael and not in_danger then
+                    if mana.Value <= 15 then
+                        utility:charge_mana_until(15)
+                    end
+                elseif has_philosophers_stone then
+                    if mana.Value < 60 then
+                        utility:charge_mana_until(60)
+                    end
+                else
+                    local ping = getPing and getPing() or 0
+                    local target = math.clamp(79 - (ping / 900 * 50), 75, 83)
+                    if mana.Value > 83 then
+                        utility:decharge_mana()
+                        while mana.Value > 83 and bb_gate_can_continue() do
+                            task.wait(0.05)
+                        end
+                    end
+                    if mana.Value < target and bb_gate_can_continue() then
+                        utility:charge_mana_until(target)
+                    end
+                end
+
+                if not bb_gate_can_continue() then return false end
+
+                -- First-time mana initialization
+                if not mana_initialized and vim then
+                    local charge_key = Enum.KeyCode.G
+                    vim:SendKeyEvent(true, charge_key, false, game)
+                    task.wait(0.15)
+                    vim:SendKeyEvent(false, charge_key, false, game)
+                    task.wait(0.2)
+                    mana_initialized = true
+                end
+
+                -- Fire gate
+                blockInputs()
+                task.delay(5, function()
+                    if INPUT_BLOCKED then unblockInputs() end
+                end)
+
+                utility:RightClick()
+                task.wait(0.8)
+
+                if FindFirstChild(gate_tool, "PsuedoChatted") then
+                    gate_tool.PsuedoChatted:FireServer(gate_location)
+                end
+
+                if INPUT_BLOCKED then unblockInputs() end
+
+                -- Wait for teleport confirmation (NoFall tag appears on character)
+                local wait_start = tick()
+                while tick() - wait_start < 2.5 and bb_gate_can_continue() do
+                    if FindFirstChild(character, "NoFall") then
+                        task.wait(1.5)
+
+                        if character and FindFirstChild(character, "HumanoidRootPart") and expected_destination then
+                            local post_gate_position = character.HumanoidRootPart.Position
+                            local distance_to_destination = (post_gate_position - expected_destination).Magnitude
+                            notify_gate_success(gate_location, distance_to_destination)
+                        else
+                            notify_gate_success(gate_location)
+                        end
+                        return true
+                    end
+                    task.wait(0.1)
+                end
+
+                notify_gate_failure(gate_location)
+                return false
+            end
+
+            local function bb_run_path()
+                if #blacksmith_bot.path_points == 0 then
+                    bb_stop("No path points set!")
+                    return
+                end
+
+                while blacksmith_bot.path_running and not shared.is_unloading do
+                    local route_interrupted = false
+                    local point_index = 1
+
+                    while point_index <= #blacksmith_bot.path_points do
+                        local point = blacksmith_bot.path_points[point_index]
+                        if not blacksmith_bot.path_running or shared.is_unloading then
+                            route_interrupted = true
+                            break
+                        end
+
+                        local emergency_player, emergency_item = bb_check_emergency_conditions()
+                        if emergency_player and emergency_item then
+                            library:Notify(string.format("Player %s has %s - instant serverhop!", emergency_player.Name, emergency_item), Color3.fromRGB(255, 80, 80))
+                            blacksmith_bot.path_running = false
+                            blacksmith_collect_active = false
+                            utility:Serverhop()
+                            return
+                        end
+
+                        if plr.Character and FindFirstChild(plr.Character, "HumanoidRootPart") then
+                            local threat = bb_check_players()
+                            if threat == "critical" then
+                                library:Notify("Player too close! Serverhopping...", Color3.fromRGB(255, 80, 80))
+                                blacksmith_bot.path_running = false
+                                blacksmith_collect_active = false
+                                if Toggles and Toggles.blacksmith_bot_run then
+                                    Toggles.blacksmith_bot_run:SetValue(false)
+                                end
+                                utility:Serverhop()
+                                return
+                            elseif threat == "proximity" then
+                                library:Notify("Player nearby, waiting 5s...", Color3.fromRGB(255, 185, 0))
+                                task.wait(5)
+                                if bb_check_players() == "proximity" or bb_check_players() == "critical" then
+                                    library:Notify("Player still nearby. Serverhopping...", Color3.fromRGB(255, 80, 80))
+                                    blacksmith_bot.path_running = false
+                                    blacksmith_collect_active = false
+                                    if Toggles and Toggles.blacksmith_bot_run then
+                                        Toggles.blacksmith_bot_run:SetValue(false)
+                                    end
+                                    utility:Serverhop()
+                                    return
+                                end
+                            end
+                        end
+
+                        local ok = bb_smooth_teleport(point.position)
+                        if not ok then
+                            route_interrupted = true
+                            break
+                        end
+
+                        if point.is_gate_point then
+                            local stay_in_server = Toggles.BBStayInServer and Toggles.BBStayInServer.Value or false
+                            local gate_success = false
+                            local gated_to_index = nil
+                            local retry_count = 0
+
+                            repeat
+                                retry_count = retry_count + 1
+                                if retry_count > 1 then
+                                    library:Notify(string.format("All gates failed - retrying (attempt %d)...", retry_count), Color3.fromRGB(255, 185, 0))
+                                    task.wait(3)
+                                end
+
+                                if not blacksmith_bot.path_running or shared.is_unloading then break end
+
+                                gated_to_index = nil
+                                local available_gates = {}
+
+                                for gate_index = point_index, #blacksmith_bot.path_points do
+                                    local gate_point = blacksmith_bot.path_points[gate_index]
+                                    if gate_point and gate_point.is_gate_point then
+                                        table.insert(available_gates, { index = gate_index, point = gate_point })
+                                    end
+                                end
+
+                                for _, gate_data in ipairs(available_gates) do
+                                    local gate_index = gate_data.index
+                                    local gate_point = gate_data.point
+
+                                    if gate_index == #blacksmith_bot.path_points then
+                                        library:Notify(string.format("Gate %d is the last point - skipping", gate_index))
+                                        continue
+                                    end
+
+                                    local next_point = blacksmith_bot.path_points[gate_index + 1]
+                                    local expected_destination = next_point and next_point.position or nil
+
+                                    gate_success = bb_execute_gate(gate_point.gate_location, expected_destination)
+                                    if gate_success then
+                                        gated_to_index = gate_index
+                                        if gate_index ~= point_index then
+                                            library:Notify(string.format("Skipped to gate point %d from point %d", gate_index, point_index))
+                                        end
+                                        break
+                                    end
+
+                                    library:Notify(string.format("Gate %d failed - trying next gate", gate_index), Color3.fromRGB(255, 185, 0))
+                                end
+                            until gate_success or not stay_in_server or not blacksmith_bot.path_running or shared.is_unloading
+
+                            if not gate_success then
+                                if blacksmith_bot.test_mode then
+                                    library:Notify("Serverhop blocked (test mode): All gate points blocked or failed")
+                                    blacksmith_bot.test_mode = false
+                                    blacksmith_bot.path_running = false
+                                    blacksmith_collect_active = false
+                                    if Toggles and Toggles.blacksmith_bot_run and Toggles.blacksmith_bot_run.Value then
+                                        Toggles.blacksmith_bot_run:SetValue(false)
+                                    end
+                                    return
+                                end
+
+                                if stay_in_server then
+                                    library:Notify("Gate retries stopped (path stopped or unloading)", Color3.fromRGB(255, 80, 80))
+                                    route_interrupted = true
+                                    break
+                                end
+
+                                library:Notify("All gate points blocked or failed - serverhopping")
+                                blacksmith_bot.path_running = false
+                                blacksmith_collect_active = false
+                                if Toggles and Toggles.blacksmith_bot_run and Toggles.blacksmith_bot_run.Value then
+                                    Toggles.blacksmith_bot_run:SetValue(false)
+                                end
+                                utility:Serverhop()
+                                return
+                            end
+
+                            task.wait(0.2)
+                            point_index = (gated_to_index or point_index) + 1
+                        elseif point.is_mine then
+                            task.wait(0.5)
+                            if not blacksmith_bot.path_running or shared.is_unloading then
+                                route_interrupted = true
+                                break
+                            end
+
+                            local danger_player, danger_item = bb_check_emergency_conditions()
+                            if danger_player and danger_item then
+                                library:Notify(string.format("Player %s has %s - instant serverhop!", danger_player.Name, danger_item), Color3.fromRGB(255, 80, 80))
+                                blacksmith_bot.path_running = false
+                                blacksmith_collect_active = false
+                                utility:Serverhop()
+                                return
+                            end
+
+                            bb_mine_here(true)
+                            task.wait(0.5)
+                            if not blacksmith_bot.path_running or shared.is_unloading then
+                                route_interrupted = true
+                                break
+                            end
+                            point_index = point_index + 1
+                        else
+                            local waypoint_wait = tonumber(Options.BBWaypointWait and Options.BBWaypointWait.Value) or 0
+                            if waypoint_wait > 0 then
+                                local wait_start = tick()
+                                while blacksmith_bot.path_running and not shared.is_unloading and (tick() - wait_start) < waypoint_wait do
+                                    local danger_player, danger_item = bb_check_emergency_conditions()
+                                    if danger_player and danger_item then
+                                        library:Notify(string.format("Player %s has %s - instant serverhop!", danger_player.Name, danger_item), Color3.fromRGB(255, 80, 80))
+                                        blacksmith_bot.path_running = false
+                                        blacksmith_collect_active = false
+                                        utility:Serverhop()
+                                        return
+                                    end
+                                    task.wait(0.1)
+                                end
+                            end
+                            point_index = point_index + 1
+                        end
+                    end
+
+                    if not blacksmith_bot.path_running or shared.is_unloading then break end
+
+                    if route_interrupted then
+                        task.wait(0.1)
+                    else
+                        if blacksmith_bot.test_mode then
+                            blacksmith_bot.test_mode = false
+                            blacksmith_bot.path_running = false
+                            blacksmith_collect_active = false
+                            if Toggles and Toggles.blacksmith_bot_run and Toggles.blacksmith_bot_run.Value then
+                                Toggles.blacksmith_bot_run:SetValue(false)
+                            end
+                            library:Notify("Blacksmith test path completed!")
+                            return
+                        end
+
+                        local stay_in_server = Toggles.BBStayInServer and Toggles.BBStayInServer.Value or false
+                        if stay_in_server then
+                            local wait_minutes = Options.BBTimeBetweenLooting and Options.BBTimeBetweenLooting.Value or 5
+                            local wait_seconds = math.max(wait_minutes, 0) * 60
+                            if wait_seconds > 0 then
+                                library:Notify(string.format("Loop completed. Waiting %dm...", wait_minutes))
+                                for _ = 1, wait_seconds do
+                                    if not blacksmith_bot.path_running or shared.is_unloading then
+                                        route_interrupted = true
+                                        break
+                                    end
+                                    task.wait(1)
+                                end
+                            end
+                        else
+                            library:Notify("Path completed! Serverhopping...")
+                            blacksmith_bot.path_running = false
+                            blacksmith_collect_active = false
+                            if Toggles and Toggles.blacksmith_bot_run and Toggles.blacksmith_bot_run.Value then
+                                Toggles.blacksmith_bot_run:SetValue(false)
+                            end
+                            utility:Serverhop()
+                            return
+                        end
+                    end
+                end
+
+                blacksmith_bot.path_running = false
+                if Toggles and Toggles.blacksmith_bot_run and Toggles.blacksmith_bot_run.Value then
+                    Toggles.blacksmith_bot_run:SetValue(false)
+                end
+            end
+
+            -- UI: Blacksmith Bot
+
+            local bb_current_path_label
+            local function bb_update_path_label(path_name)
+                blacksmith_bot.current_path_name = path_name or ""
+                if bb_current_path_label and bb_current_path_label.Text then
+                    if path_name and path_name ~= "" then
+                        bb_current_path_label:SetText("Currently Editing: " .. path_name)
+                    else
+                        bb_current_path_label:SetText("Currently Editing: None")
+                    end
+                end
+            end
+
+            local function bb_get_saved_paths()
+                if not listfiles then
+                    return {}
+                end
+
+                local folder_path = "HYDROXIDE/blacksmith_paths"
+                if isfolder and not isfolder(folder_path) then
+                    -- try backslash variant too
+                    local alt_path = "HYDROXIDE\\blacksmith_paths"
+                    if not isfolder(alt_path) then
+                        if makefolder then makefolder(folder_path) end
+                    end
+                end
+
+                local success, files = pcall(listfiles, folder_path)
+                if not success or type(files) ~= "table" then
+                    -- try backslash variant
+                    local ok, files2 = pcall(listfiles, "HYDROXIDE\\blacksmith_paths")
+                    if not ok or type(files2) ~= "table" then
+                        return {}
+                    end
+                    files = files2
+                end
+
+                local path_names = {}
+                for _, file_path in ipairs(files) do
+                    local file_name = file_path:match("([^/\\]+)%.json$")
+                    if file_name then
+                        table.insert(path_names, file_name)
+                    end
+                end
+                return path_names
+            end
+
+            local function bb_apply_settings(settings)
+                if not settings then return end
+                if Options.BBWaypointWait then Options.BBWaypointWait:SetValue(tostring(settings.waypoint_wait or 0)) end
+                if Options.BBGateLocation then Options.BBGateLocation:SetValue(settings.gate_location or "") end
+                if Toggles.BBVisualizePoints then Toggles.BBVisualizePoints:SetValue(settings.visualize_points or false) end
+                if Options.BBSpeed then Options.BBSpeed:SetValue(settings.speed or 130) end
+
+                if Options.BBProximityCheck then Options.BBProximityCheck:SetValue(settings.proximity_check or 0) end
+                if Options.BBCriticalDistance then Options.BBCriticalDistance:SetValue(settings.critical_distance or 60) end
+                if Options.BBMinPlayerCount then Options.BBMinPlayerCount:SetValue(settings.min_player_count or 0) end
+                if Toggles.BBDisableGPU then Toggles.BBDisableGPU:SetValue(settings.disable_gpu_rendering or false) end
+                if Toggles.BBJoinOldestServer then Toggles.BBJoinOldestServer:SetValue(settings.join_oldest_server or false) end
+                if Options.BBEmergencyServerhopConditions then Options.BBEmergencyServerhopConditions:SetValue(settings.emergency_serverhop_conditions or {Perflora = true, Pebble = true}) end
+
+                if Toggles.BBStayInServer then Toggles.BBStayInServer:SetValue(settings.stay_in_server or false) end
+                if Toggles.BBReequipGateInLoop then Toggles.BBReequipGateInLoop:SetValue(settings.reequip_gate_in_loop == nil and true or settings.reequip_gate_in_loop) end
+                if Options.BBTimeBetweenLooting then Options.BBTimeBetweenLooting:SetValue(settings.time_between_looting or 5) end
+            end
+
+            local function bb_load_path_by_name(path_name)
+                if not path_name or path_name == "" then
+                    library:Notify("Please select a path!")
+                    return false
+                end
+
+                if not readfile or not isfile then
+                    library:Notify("readfile/isfile not supported!")
+                    return false
+                end
+
+                local file_path = "HYDROXIDE/blacksmith_paths/" .. path_name .. ".json"
+                if not isfile(file_path) then
+                    library:Notify(string.format("Path '%s' not found!", path_name))
+                    return false
+                end
+
+                local httpService = Services.HttpService
+                local success, save_data = pcall(function()
+                    local json = readfile(file_path)
+                    return httpService:JSONDecode(json)
+                end)
+
+                if success and save_data and save_data.points and #save_data.points > 0 then
+                    blacksmith_bot.path_points = {}
+                    for _, point_data in ipairs(save_data.points) do
+                        table.insert(blacksmith_bot.path_points, {
+                            position = Vector3.new(point_data.x, point_data.y, point_data.z),
+                            is_mine = point_data.is_mine or false,
+                            is_gate_point = point_data.is_gate_point or false,
+                            gate_location = point_data.gate_location or "",
+                        })
+                    end
+
+                    bb_apply_settings(save_data.settings)
+                    bb_update_path_label(path_name)
+                    if Options.BBPathName then Options.BBPathName:SetValue(path_name) end
+
+                    if Toggles.BBVisualizePoints and Toggles.BBVisualizePoints.Value then
+                        blacksmith_bot.visualize_enabled = true
+                        bb_update_visualizations()
+                    end
+
+                    library:Notify(string.format("Loaded blacksmith path '%s' with %d points", path_name, #blacksmith_bot.path_points))
+                    return true
+                else
+                    library:Notify("Failed to load blacksmith path!")
+                    blacksmith_bot.path_points = {}
+                    return false
+                end
+            end
+
+            local function bb_start_path(test_mode)
+                if blacksmith_bot.path_running then
+                    library:Notify("Blacksmith bot is already running")
+                    return
+                end
+
+                if not plr.Character or not FindFirstChild(plr.Character, "HumanoidRootPart") then
+                    bb_stop("Character not found.")
+                    return
+                end
+
+                if #blacksmith_bot.path_points == 0 then
+                    bb_stop("No points set! Add points first.")
+                    return
+                end
+
+                local has_pickaxe = FindFirstChild(plr.Character, "Pickaxe") or FindFirstChild(plr.Backpack, "Pickaxe")
+                if not has_pickaxe then
+                    library:Notify("Pickaxe not found!", Color3.fromRGB(255, 80, 80))
+                    return
+                end
+
+                local first_point = blacksmith_bot.path_points[1] and blacksmith_bot.path_points[1].position
+                if not first_point or typeof(first_point) ~= "Vector3" then
+                    library:Notify("Invalid path data! Please reload or recreate the path.", Color3.fromRGB(255, 80, 80))
+                    return
+                end
+
+                local root = plr.Character.HumanoidRootPart
+                local distance_to_first = (root.Position - first_point).Magnitude
+                if distance_to_first > 400 then
+                    library:Notify(string.format("Too far from first checkpoint! Distance: %.0f studs (max 400)", distance_to_first), Color3.fromRGB(255, 185, 0))
+                    return
+                end
+
+                blacksmith_bot.test_mode = test_mode and true or false
+                blacksmith_collect_active = true
+                blacksmith_bot.path_running = true
+                library:Notify(blacksmith_bot.test_mode and "Starting blacksmith test path..." or "Starting blacksmith path...")
+                task.spawn(function()
+                    local ok, err = pcall(bb_run_path)
+                    if not ok then
+                        warn("[Blacksmith Bot] Runtime error: " .. tostring(err))
+                        library:Notify("Blacksmith Bot error: " .. tostring(err), Color3.fromRGB(255, 80, 80))
+                    end
+                    blacksmith_bot.path_running = false
+                    blacksmith_collect_active = false
+                    if Toggles and Toggles.blacksmith_bot_run and Toggles.blacksmith_bot_run.Value then
+                        Toggles.blacksmith_bot_run:SetValue(false)
+                    end
+                end)
+            end
+
+            group_blacksmith_bot:AddInput("BBWaypointWait", {
+                Default = "0",
+                Numeric = true,
+                Finished = false,
+                Text = "Waypoint Wait (seconds)",
+                Tooltip = "How long to wait at each regular waypoint (0 = no wait)",
+                Placeholder = "0"
+            })
+
+            group_blacksmith_bot:AddButton({
+                Text = "Create Point",
+                Tooltip = "Add current position as a travel waypoint (no mining)",
+                Func = function()
+                    if not plr.Character or not FindFirstChild(plr.Character, "HumanoidRootPart") then
+                        library:Notify("Character not found!")
+                        return
+                    end
+                    local pos = plr.Character.HumanoidRootPart.Position
+                    table.insert(blacksmith_bot.path_points, {position = pos, is_mine = false, is_gate_point = false})
+                    library:Notify(string.format("Created point %d", #blacksmith_bot.path_points))
+                    bb_update_visualizations()
+                end
+            })
+
+            group_blacksmith_bot:AddLabel("Create Point Keybind"):AddKeyPicker("BBCreatePointKeybind", {
+                Default = "None",
+                Text = "Create Point",
+                Mode = "Press",
+                Callback = function()
+                    if not plr.Character or not FindFirstChild(plr.Character, "HumanoidRootPart") then return end
+                    local pos = plr.Character.HumanoidRootPart.Position
+                    table.insert(blacksmith_bot.path_points, {position = pos, is_mine = false, is_gate_point = false})
+                    library:Notify(string.format("Created point %d", #blacksmith_bot.path_points))
+                    bb_update_visualizations()
+                end
+            })
+
+            group_blacksmith_bot:AddButton({
+                Text = "Undo Point",
+                Func = function()
+                    if #blacksmith_bot.path_points == 0 then
+                        library:Notify("No points to undo!")
+                        return
+                    end
+                    table.remove(blacksmith_bot.path_points)
+                    library:Notify(string.format("Removed last point. %d remaining", #blacksmith_bot.path_points))
+                    bb_update_visualizations()
+                end
+            })
+
+            group_blacksmith_bot:AddButton({
+                Text = "Set Mine",
+                Tooltip = "Add current position as a mining spot (waits 1 second, then performs one instant mine burst)",
+                Func = function()
+                    if not plr.Character or not FindFirstChild(plr.Character, "HumanoidRootPart") then
+                        library:Notify("Character not found!")
+                        return
+                    end
+                    local pos = plr.Character.HumanoidRootPart.Position
+                    table.insert(blacksmith_bot.path_points, {position = pos, is_mine = true, is_gate_point = false})
+                    library:Notify(string.format("Mine spot #%d added", #blacksmith_bot.path_points))
+                    bb_update_visualizations()
+                end
+            })
+
+            group_blacksmith_bot:AddButton({
+                Text = "Clear Points",
+                DoubleClick = true,
+                Func = function()
+                    blacksmith_bot.path_points = {}
+                    library:Notify("All points cleared")
+                    bb_update_visualizations()
+                end
+            })
+
+            group_blacksmith_bot:AddInput("BBGateLocation", {
+                Default = "",
+                Numeric = false,
+                Finished = false,
+                Text = "Gate Location",
+                Tooltip = "Enter gate destination (e.g., 'Tundra 7', 'Desert 4')",
+                Placeholder = "e.g. Tundra 7"
+            })
+
+            group_blacksmith_bot:AddButton({
+                Text = "Add Gate",
+                Func = function()
+                    if not plr.Character or not FindFirstChild(plr.Character, "HumanoidRootPart") then
+                        library:Notify("Character not found!")
+                        return
+                    end
+
+                    local gate_location = Options.BBGateLocation and Options.BBGateLocation.Value or ""
+                    if gate_location == "" then
+                        library:Notify("Please enter a gate location!")
+                        return
+                    end
+
+                    local pos = plr.Character.HumanoidRootPart.Position
+                    table.insert(blacksmith_bot.path_points, {
+                        position = pos,
+                        is_mine = false,
+                        is_gate_point = true,
+                        gate_location = gate_location,
+                    })
+
+                    library:Notify(string.format("Added gate point: %s (#%d)", gate_location, #blacksmith_bot.path_points))
+                    bb_update_visualizations()
+                end
+            })
+
+            group_blacksmith_bot:AddButton({
+                Text = "Execute Gate (test)",
+                Func = function()
+                    local gate_location = Options.BBGateLocation and Options.BBGateLocation.Value or ""
+                    if gate_location == "" then
+                        library:Notify("Please enter a gate location!")
+                        return
+                    end
+
+                    library:Notify(string.format("Attempting to gate to %s...", gate_location))
+                    task.spawn(function()
+                        bb_execute_gate(gate_location)
+                    end)
+                end
+            })
+
+            group_blacksmith_bot:AddToggle("BBVisualizePoints", {
+                Text = "Visualize Points",
+                Default = false,
+                Callback = function(value)
+                    blacksmith_bot.visualize_enabled = value
+                    bb_update_visualizations()
+                end
+            })
+
+            group_blacksmith_bot:AddSlider("BBProximityCheck", {
+                Text = "Proximity Check (studs)",
+                Default = 0,
+                Min = 0,
+                Max = 1000,
+                Rounding = 0,
+                Compact = true,
+                Tooltip = "If a player is within X studs, wait 5s then serverhop (0 = disabled)"
+            })
+
+            group_blacksmith_bot:AddSlider("BBCriticalDistance", {
+                Text = "Critical Distance (studs)",
+                Default = 60,
+                Min = 0,
+                Max = 1000,
+                Rounding = 0,
+                Compact = true,
+                Tooltip = "Instantly serverhop if a player is within this range (0 = disabled)"
+            })
+
+            group_blacksmith_bot:AddSlider("BBMinPlayerCount", {
+                Text = "Min Player Count",
+                Default = 0,
+                Min = 0,
+                Max = 23,
+                Rounding = 0,
+                Compact = true
+            })
+
+            group_blacksmith_bot:AddDivider()
+
+            group_blacksmith_bot:AddToggle("BBDisableGPU", {
+                Text = "Disable GPU Rendering",
+                Default = false,
+                Tooltip = "Disables 3D rendering when window loses focus to save CPU/GPU resources",
+                Callback = function(value)
+                    if value then
+                        if not cpu.status.active then
+                            cpu.status.active = true
+                            if shared.bb_focusConnection then shared.bb_focusConnection:Disconnect() end
+                            shared.bb_focusConnection = utility:Connection(uis.WindowFocused, function()
+                                if not (Toggles.BBDisableGPU and Toggles.BBDisableGPU.Value) then return end
+                                setfpscap(25)
+                                cpu.services.ugs.MasterVolume = cpu.services.ms
+                                settings().Rendering.QualityLevel = cpu.services.ql
+                                cpu.services.rs:Set3dRenderingEnabled(true)
+                            end)
+                            if shared.bb_unfocusConnection then shared.bb_unfocusConnection:Disconnect() end
+                            shared.bb_unfocusConnection = utility:Connection(uis.WindowFocusReleased, function()
+                                if not (Toggles.BBDisableGPU and Toggles.BBDisableGPU.Value) then return end
+                                setfpscap(25)
+                                settings().Rendering.QualityLevel = 1
+                                cpu.services.rs:Set3dRenderingEnabled(false)
+                            end)
+                        end
+                    else
+                        cpu.status.active = false
+                        setfpscap(240)
+                        settings().Rendering.QualityLevel = cpu.services.ql
+                        cpu.services.rs:Set3dRenderingEnabled(true)
+                        if shared.bb_focusConnection then shared.bb_focusConnection:Disconnect() shared.bb_focusConnection = nil end
+                        if shared.bb_unfocusConnection then shared.bb_unfocusConnection:Disconnect() shared.bb_unfocusConnection = nil end
+                    end
+                end
+            })
+
+            group_blacksmith_bot:AddToggle("BBJoinOldestServer", {
+                Text = "Join Oldest Server",
+                Default = false,
+                Tooltip = "Always join the oldest available server when serverhopping"
+            })
+
+            group_blacksmith_bot:AddDropdown("BBEmergencyServerhopConditions", {
+                Text = "Emergency Serverhop Conditions",
+                Tooltip = "Select items that trigger instant serverhop when equipped by another player",
+                Values = {"Perflora", "Pebble"},
+                Multi = true,
+                Default = {"Perflora", "Pebble"},
+                Compact = true
+            })
+
+            group_blacksmith_bot:AddDivider()
+
+            group_blacksmith_bot:AddSlider("BBSpeed", {
+                Text = "Speed",
+                Default = cheat_client.config.blacksmith_collect_speed,
+                Min = 0,
+                Max = 300,
+                Rounding = 0,
+                Callback = function(value)
+                    cheat_client.config.blacksmith_collect_speed = value
+                end
+            })
+
+            group_blacksmith_looping:AddToggle("BBStayInServer", {
+                Text = "Stay in Server",
+                Default = false,
+                Tooltip = "Loops the path in the same server instead of serverhopping"
+            })
+
+            group_blacksmith_looping:AddToggle("BBReequipGateInLoop", {
+                Text = "Re-equip Gate in Loop",
+                Default = true,
+                Tooltip = "Automatically re-equip Gate tool during loop"
+            })
+
+            group_blacksmith_looping:AddSlider("BBTimeBetweenLooting", {
+                Text = "Time Between Looting",
+                Default = 5,
+                Min = 0,
+                Max = 30,
+                Rounding = 0,
+                Suffix = "m",
+                Tooltip = "Wait time before restarting blacksmith path loop (in minutes)"
+            })
+
+            bb_current_path_label = group_blacksmith_config:AddLabel("Currently Editing: None")
+            group_blacksmith_config:AddDivider()
+
+            group_blacksmith_config:AddInput("BBPathName", {
+                Text = "Path Name",
+                Default = "",
+                Placeholder = "Enter new path name to save..."
+            })
+
+            group_blacksmith_config:AddButton({
+                Text = "New Path",
+                Func = function()
+                    blacksmith_bot.path_points = {}
+                    bb_update_path_label(nil)
+                    bb_update_visualizations()
+
+                    if Options.BBPathName then
+                        Options.BBPathName:SetValue("")
+                    end
+                    if Options.BBSavedPaths then
+                        Options.BBSavedPaths:SetValue(nil)
+                    end
+
+                    library:Notify("Started new blacksmith path - enter a name before saving")
+                end
+            })
+
+            group_blacksmith_config:AddDivider()
+
+            local bb_saved_paths = bb_get_saved_paths()
+            group_blacksmith_config:AddDropdown("BBSavedPaths", {
+                Text = "Saved Paths",
+                Values = bb_saved_paths,
+                Multi = false,
+                Callback = function(value)
+                    bb_load_path_by_name(value)
+                end
+            })
+
+            group_blacksmith_config:AddButton({
+                Text = "Refresh Paths",
+                Func = function()
+                    local paths = bb_get_saved_paths()
+                    if Options.BBSavedPaths then
+                        Options.BBSavedPaths:SetValues(paths)
+                        library:Notify(string.format("Found %d blacksmith paths", #paths))
+                    end
+                end
+            })
+
+            group_blacksmith_config:AddButton({
+                Text = "Save Path",
+                Func = function()
+                    local path_name = Options.BBPathName and Options.BBPathName.Value or ""
+                    if path_name == "" then
+                        library:Notify("Please enter a path name!")
+                        return
+                    end
+                    if #blacksmith_bot.path_points == 0 then
+                        library:Notify("No points to save!")
+                        return
+                    end
+                    if not writefile then
+                        library:Notify("writefile not supported!")
+                        return
+                    end
+
+                    local folder_path = "HYDROXIDE/blacksmith_paths"
+                    if makefolder then
+                        if isfolder and not isfolder(folder_path) then
+                            makefolder(folder_path)
+                        elseif not isfolder then
+                            makefolder(folder_path)
+                        end
+                        -- also ensure with backslash variant
+                        pcall(makefolder, "HYDROXIDE\\blacksmith_paths")
+                    end
+
+                    local serialized_points = {}
+                    for _, point in ipairs(blacksmith_bot.path_points) do
+                        table.insert(serialized_points, {
+                            x = point.position.X,
+                            y = point.position.Y,
+                            z = point.position.Z,
+                            is_mine = point.is_mine or false,
+                            is_gate_point = point.is_gate_point or false,
+                            gate_location = point.gate_location or "",
+                        })
+                    end
+
+                    local save_data = {
+                        points = serialized_points,
+                        settings = {
+                            waypoint_wait = tonumber(Options.BBWaypointWait and Options.BBWaypointWait.Value) or 0,
+                            gate_location = Options.BBGateLocation and Options.BBGateLocation.Value or "",
+                            visualize_points = Toggles.BBVisualizePoints and Toggles.BBVisualizePoints.Value or false,
+                            speed = Options.BBSpeed and Options.BBSpeed.Value or 130,
+                            proximity_check = Options.BBProximityCheck and Options.BBProximityCheck.Value or 0,
+                            critical_distance = Options.BBCriticalDistance and Options.BBCriticalDistance.Value or 60,
+                            min_player_count = Options.BBMinPlayerCount and Options.BBMinPlayerCount.Value or 0,
+                            disable_gpu_rendering = Toggles.BBDisableGPU and Toggles.BBDisableGPU.Value or false,
+                            join_oldest_server = Toggles.BBJoinOldestServer and Toggles.BBJoinOldestServer.Value or false,
+                            emergency_serverhop_conditions = Options.BBEmergencyServerhopConditions and Options.BBEmergencyServerhopConditions.Value or {},
+                            stay_in_server = Toggles.BBStayInServer and Toggles.BBStayInServer.Value or false,
+                            reequip_gate_in_loop = Toggles.BBReequipGateInLoop == nil and true or Toggles.BBReequipGateInLoop.Value,
+                            time_between_looting = Options.BBTimeBetweenLooting and Options.BBTimeBetweenLooting.Value or 5,
+                        }
+                    }
+
+                    local file_path = folder_path .. "/" .. path_name .. ".json"
+                    local is_overwrite = isfile and isfile(file_path)
+                    local success, err = pcall(function()
+                        local json = Services.HttpService:JSONEncode(save_data)
+                        writefile(file_path, json)
+                    end)
+
+                    if success then
+                        local paths = bb_get_saved_paths()
+                        if is_overwrite then
+                            library:Notify(string.format("Overwritten '%s' (%d pts) | %d paths total", path_name, #blacksmith_bot.path_points, #paths))
+                        else
+                            library:Notify(string.format("Saved '%s' (%d pts) | %d paths total", path_name, #blacksmith_bot.path_points, #paths))
+                        end
+                        bb_update_path_label(path_name)
+                        if Options.BBSavedPaths then
+                            Options.BBSavedPaths:SetValues(paths)
+                            if #paths > 0 then
+                                Options.BBSavedPaths:SetValue(path_name)
+                            end
+                        end
+                    else
+                        library:Notify("Failed to save blacksmith path: " .. tostring(err))
+                    end
+                end
+            })
+
+            group_blacksmith_config:AddButton({
+                Text = "Delete Path",
+                DoubleClick = true,
+                Func = function()
+                    local path_name = Options.BBSavedPaths and Options.BBSavedPaths.Value or ""
+                    if path_name == "" then
+                        library:Notify("Please select a path to delete!")
+                        return
+                    end
+                    if not delfile or not isfile then
+                        library:Notify("delfile/isfile not supported!")
+                        return
+                    end
+
+                    local file_path = "HYDROXIDE/blacksmith_paths/" .. path_name .. ".json"
+                    if not isfile(file_path) then
+                        library:Notify(string.format("Path '%s' not found!", path_name))
+                        return
+                    end
+
+                    local success, err = pcall(function()
+                        delfile(file_path)
+                    end)
+
+                    if success then
+                        library:Notify(string.format("Deleted blacksmith path '%s'", path_name))
+                        bb_update_path_label(nil)
+                        if Options.BBSavedPaths then
+                            local paths = bb_get_saved_paths()
+                            Options.BBSavedPaths:SetValues(paths)
+                            Options.BBSavedPaths:SetValue(nil)
+                        end
+                        blacksmith_bot.path_points = {}
+                        bb_update_visualizations()
+                    else
+                        library:Notify("Failed to delete blacksmith path: " .. tostring(err))
+                    end
+                end
+            })
+
+            group_blacksmith_config:AddDivider()
+
+            group_blacksmith_config:AddButton({
+                Text = "Start Path",
+                Func = function()
+                    bb_start_path(false)
+                end
+            })
+
+            group_blacksmith_config:AddButton({
+                Text = "Test Path",
+                Func = function()
+                    bb_start_path(true)
+                end
+            })
+
+            group_blacksmith_config:AddButton({
+                Text = "Stop Path",
+                Func = function()
+                    blacksmith_bot.test_mode = false
+                    if blacksmith_bot.path_running then
+                        bb_stop(nil)
+                        library:Notify("Blacksmith path stopped")
+                    else
+                        library:Notify("Blacksmith path is not running")
+                    end
+                end
+            })
 
             group_trinket_bot:AddInput("PointWaitTime", {
                 Default = "0",
@@ -17644,11 +19322,9 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
 
                     library:Notify(string.format("Attempting to gate to %s...", gate_location))
                     task.spawn(function()
-                        local success = Gate(gate_location)
-                        if success then
-                            library:Notify(string.format("Successfully gated to %s!", gate_location))
-                        else
-                            library:Notify(string.format("Failed to gate to %s", gate_location))
+                        local success = Gate(gate_location, nil, true)
+                        if not success then
+                            notify_gate_failure(gate_location)
                         end
                     end)
                 end
@@ -17856,7 +19532,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                 Rounding = 0
             })
 
-            local group_trinket_config = Tabs.Botting:AddRightGroupbox("Trinket Bot Config")
+            -- group_trinket_config declared above for layout ordering
             local current_path_label
             local function update_path_label(path_name)
                 trinket_bot.current_path_name = path_name or ""
@@ -18542,21 +20218,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                                                     local prox_check_dist = Options.ProximityCheck and Options.ProximityCheck.Value or 0
                                                     if prox_check_dist > 0 and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
                                                         local char_pos = plr.Character.HumanoidRootPart.Position
-
-                                                        for _, other_player in next, plrs:GetPlayers() do
-                                                            if other_player ~= plr and other_player.Character and other_player.Character:FindFirstChild("HumanoidRootPart") then
-                                                                local dist = (other_player.Character.HumanoidRootPart.Position - char_pos).Magnitude
-
-                                                                if dist <= prox_check_dist then
-                                                                    library:Notify(string.format("Player %s within %d studs during far recovery - serverhopping", other_player.Name, math.floor(dist)))
-                                                                    SafeServerhop(string.format("Player %s within %d studs during far path recovery", other_player.Name, math.floor(prox_check_dist)))
-                                                                    return
-                                                                end
-                                                            end
-                                                        end
                                                     end
-
-                                                    local gate_recovery_character = plr.Character
                                                     local gate_recovery_ff_removed = false
                                                     local gate_recovery_teleport_platform = nil
 
@@ -18897,6 +20559,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
 
             group_trinket_config:AddButton({
                 Text = "Delete Path",
+                DoubleClick = true,
                 Func = function()
                     local path_name = Options.SavedPaths and Options.SavedPaths.Value or ""
                     if path_name == "" then
@@ -18956,11 +20619,12 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                 end
             })
 
-            local stop_button = group_trinket_config:AddButton("stop_bot", {
-                Text = "Stop Bot",
-                Tooltip = "Stop the currently running bot",
+            group_trinket_config:AddButton({
+                Text = "Stop Path",
+                Tooltip = "Safely stop the currently running path",
                 Func = function()
                     if trinket_bot.path_running then
+                        trinket_bot.stop_requested = true
                         trinket_bot.path_running = false
                         mem:RemoveItem("botstarted")
                         mem:RemoveItem("serverhop_count")
@@ -19074,7 +20738,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                             update_visualizations()
                         end
 
-                        library:Notify("Bot manually stopped")
+                        library:Notify("Path manually stopped")
                     else
                         local was_botstarted = mem:HasItem("botstarted") and mem:GetItem("botstarted") == "true"
                         trinket_bot.path_running = false
@@ -19082,24 +20746,15 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                         mem:RemoveItem("serverhop_count")
 
                         if was_botstarted then
-                            library:Notify("Bot state reset (was in inconsistent state)")
+                            library:Notify("Path state reset (was in inconsistent state)")
                         else
-                            library:Notify("Bot is not running")
+                            library:Notify("Path is not running")
                         end
                     end
                 end
             })
 
-            stop_button:SetVisible(false)
-
-            task.spawn(function()
-                while shared and not shared.is_unloading and task.wait(0.5) do
-                    local is_running = trinket_bot.path_running or (mem:HasItem("botstarted") and mem:GetItem("botstarted") == "true")
-                    stop_button:SetVisible(is_running)
-                end
-            end)
-
-            local group_trinket_looping = Tabs.Botting:AddRightGroupbox("Looping Settings")
+            -- group_trinket_looping declared above for layout ordering
 
             group_trinket_looping:AddToggle("StayInServer", {
                 Text = "Stay in Server",
@@ -19193,7 +20848,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                                     task.wait(1)
                                     local new_lives = Get("Lives")
                                     if new_lives then
-                                        local msg = string.format("Auto Popped Phoenix Down: %d → %d lives", old_lives, new_lives)
+                                        local msg = string.format("Auto Popped Phoenix Down: %d � %d lives", old_lives, new_lives)
                                         library:Notify(msg)
                                         local server_name, server_region = get_server_info()
 
@@ -19208,7 +20863,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                                         local embed = {
                                             title = "Auto Popped Phoenix Down",
                                             description = string.format(
-                                                "**Server:** `%s (%s)`\n**Lives:** `%d → %d`",
+                                                "**Server:** `%s (%s)`\n**Lives:** `%d � %d`",
                                                 server_name ~= "" and server_name or "Unknown",
                                                 server_region ~= "" and server_region or "Unknown",
                                                 old_lives,
@@ -19256,6 +20911,15 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
 
             local function drop_item(item)
                 if not (mem:HasItem("botstarted") and mem:GetItem("botstarted") == "true") then
+                    return
+                end
+
+                if not (trinket_bot and trinket_bot.path_running) then
+                    return
+                end
+
+                -- Never drop during blacksmith bot runs
+                if blacksmith_bot and blacksmith_bot.path_running then
                     return
                 end
 
@@ -19399,6 +21063,8 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
 
                     local bot_started = mem:HasItem("botstarted") and mem:GetItem("botstarted") == "true"
                     if not bot_started then return end
+                    if not (trinket_bot and trinket_bot.path_running) then return end
+                    if blacksmith_bot and blacksmith_bot.path_running then return end
 
                     if not obj:IsA("Tool") then return end
 
@@ -19420,6 +21086,8 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                     end
 
                     task.wait(0.67)
+
+                    if not (trinket_bot and trinket_bot.path_running) then return end
 
                     for _, item in ipairs(backpack:GetChildren()) do
                         if item then
@@ -25228,7 +26896,7 @@ if game.PlaceId == 3541987450 or game.PlaceId == 5208655184 or game.PlaceId == 1
                 if (library ~= nil and library.Notify) then
                     utility:sound("rbxassetid://2865227039",2)
                     library:Notify({
-                        Title = "⚠️ ILLUSIONIST DETECTED",
+                        Title = "?? ILLUSIONIST DETECTED",
                         Description = cheat_client:get_name(player).." ["..player.Name.."] is an illusionist",
                         Time = 10
                     })
@@ -26227,7 +27895,7 @@ end
                             local area_text = area ~= "None" and " ("..area..")" or ""
 
                             local artifact_list = table.concat(artifact_names, ", ")
-                            local msg = string.format("✨ Artifact%s Spawned: %s%s",
+                            local msg = string.format("? Artifact%s Spawned: %s%s",
                                 #artifact_names > 1 and "s" or "",
                                 artifact_list,
                                 area_text
